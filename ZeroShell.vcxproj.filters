@@ -39,12 +39,6 @@
     <ClCompile Include="src\line_editor.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\module_manager.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="src\module_menu.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\shell.h">
@@ -66,15 +60,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\line_editor.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="include\module.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="include\module_manager.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
-    <ClInclude Include="include\module_menu.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

@@ -5,7 +5,6 @@
 #include "completion.h"
 #include "highlight.h"
 #include "line_editor.h"
-#include "module_manager.h"
 
 #include <iostream>
 #include <filesystem>
@@ -17,11 +16,9 @@ Shell::Shell()
     , builtins_(std::make_unique<Builtins>())
     , completion_(std::make_unique<Completion>(*builtins_))
     , highlight_(std::make_unique<Highlight>())
-    , editor_(std::make_unique<LineEditor>())
-    , moduleManager_(std::make_unique<ModuleManager>()) {
+    , editor_(std::make_unique<LineEditor>()) {
 
     builtins_->setExitFlag(&running_);
-    builtins_->setModuleManager(moduleManager_.get());
 
     // 设置补全回调
     editor_->setCompletionCallback([this](const std::string& input, int& ctx) -> std::vector<std::string> {
@@ -42,16 +39,6 @@ Shell::Shell()
         editor_->historyLoad(histPath.string());
         free(home);
     }
-
-    // 加载模块配置
-    std::filesystem::path configDir = std::filesystem::current_path() / ".config" / "modules";
-    moduleManager_->loadConfigs(configDir.string());
-
-    // 加载所有启用的模块
-    auto configNames = moduleManager_->getConfigNames();
-    for (const auto& name : configNames) {
-        moduleManager_->loadModule(name);
-    }
 }
 
 Shell::~Shell() {
@@ -64,9 +51,6 @@ Shell::~Shell() {
         editor_->historySave(histPath.string());
         free(home);
     }
-
-    // 卸载所有模块
-    moduleManager_->unloadAll();
 }
 
 void Shell::run() {

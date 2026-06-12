@@ -57,14 +57,15 @@ void LineEditor::redrawLine(const std::string& prompt) {
 
     // Restore cursor to correct position
     SHORT cursorX = promptStartX_ + static_cast<SHORT>(prompt.size()) + static_cast<SHORT>(cursorPos_);
+    SHORT cursorY = lineY_;
 
-    // Handle line wrapping
+    // Handle line wrapping (use local variable, don't modify lineY_)
     while (cursorX >= consoleWidth_) {
         cursorX -= consoleWidth_;
-        lineY_++;
+        cursorY++;
     }
 
-    COORD cursorPos = { cursorX, lineY_ };
+    COORD cursorPos = { cursorX, cursorY };
     SetConsoleCursorPosition(hOut_, cursorPos);
 }
 
@@ -294,6 +295,8 @@ bool LineEditor::handleTab(const std::string& prompt) {
             }
         }
     }
+
+    return false;
 }
 
 std::string LineEditor::readLine(const std::string& prompt) {

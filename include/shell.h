@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "module_manager.h"
 
 class Parser;
 class Executor;
@@ -26,7 +25,6 @@ private:
     std::unique_ptr<Completion> completion_;
     std::unique_ptr<Highlight> highlight_;
     std::unique_ptr<LineEditor> editor_;
-    std::unique_ptr<ModuleManager> moduleManager_;
 
     bool running_ = true;
 

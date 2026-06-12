@@ -160,8 +160,6 @@
     <ClCompile Include="src\completion.cpp" />
     <ClCompile Include="src\highlight.cpp" />
     <ClCompile Include="src\line_editor.cpp" />
-    <ClCompile Include="src\module_manager.cpp" />
-    <ClCompile Include="src\module_menu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\shell.h" />
@@ -171,9 +169,6 @@
     <ClInclude Include="include\completion.h" />
     <ClInclude Include="include\highlight.h" />
     <ClInclude Include="include\line_editor.h" />
-    <ClInclude Include="include\module.h" />
-    <ClInclude Include="include\module_manager.h" />
-    <ClInclude Include="include\module_menu.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

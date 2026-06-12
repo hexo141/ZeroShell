@@ -1,29 +1,33 @@
 #pragma once
 
-#include <windows.h>
+#include <string>
+#include <vector>
+#include <filesystem>
 
-// 模块信息结构
-struct ModuleInfo {
-    const char* name;        // 模块名称
-    const char* description; // 模块描述
-    const char* version;     // 版本号
+// 模块抽象基类
+// 每个模块独立管理自己的命令、数据和生命周期
+class Module {
+public:
+    virtual ~Module() = default;
+
+    // 模块元数据
+    virtual const char* name() const = 0;
+    virtual const char* description() const = 0;
+
+    // 生命周期
+    virtual void init() {}           // 模块初始化，在注册后调用
+    virtual void shutdown() {}       // 模块关闭，在销毁前调用
+
+    // 命令注册：返回该模块提供的所有命令名
+    virtual std::vector<std::string> getCommands() const = 0;
+
+    // 命令执行：返回 true 表示命令已处理
+    virtual bool execute(const std::string& cmd, const std::vector<std::string>& args) = 0;
+
+    // 补全支持：返回该模块针对当前输入的补全建议
+    virtual std::vector<std::string> complete(const std::string& cmd, const std::string& prefix) { return {}; }
+
+    // 数据持久化：保存/加载模块数据到指定目录
+    virtual void saveData(const std::filesystem::path& dir) {}
+    virtual void loadData(const std::filesystem::path& dir) {}
 };
-
-// 命令结构
-struct ModuleCommand {
-    const char* name;        // 命令名
-    const char* description; // 命令描述
-    int (*execute)(int argc, char** argv); // 执行函数
-};
-
-// DLL 导出接口定义
-extern "C" {
-    // 获取模块信息
-    typedef ModuleInfo* (*GetModuleInfoFunc)();
-    // 获取命令列表
-    typedef ModuleCommand** (*GetCommandsFunc)(int* count);
-    // 初始化模块
-    typedef int (*InitModuleFunc)();
-    // 清理模块
-    typedef void (*CleanupModuleFunc)();
-}

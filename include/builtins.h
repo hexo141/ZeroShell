@@ -5,8 +5,6 @@
 #include <functional>
 #include <unordered_map>
 
-class ModuleManager;
-
 class Builtins {
 public:
     Builtins();
@@ -15,10 +13,8 @@ public:
     int execute(const std::string& name, const std::vector<std::string>& args);
     std::vector<std::string> getNames() const;
     void setExitFlag(bool* flag);
-    void setModuleManager(ModuleManager* mgr);
 
 private:
     std::unordered_map<std::string, std::function<int(const std::vector<std::string>&)>> commands_;
     bool* exitFlag_ = nullptr;
-    ModuleManager* moduleManager_ = nullptr;
 };

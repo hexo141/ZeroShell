@@ -1,6 +1,4 @@
 #include "builtins.h"
-#include "module_manager.h"
-#include "module_menu.h"
 #include <iostream>
 #include <filesystem>
 #include <cstdlib>
@@ -233,22 +231,6 @@ Builtins::Builtins() {
 
         return 0;
     };
-
-    commands_["mm"] = [this](const std::vector<std::string>& args) -> int {
-        if (!moduleManager_) {
-            std::cerr << "mm: module manager not initialized\n";
-            return 1;
-        }
-
-        if (args.empty()) {
-            // 显示模块菜单
-            showModuleMenu(*moduleManager_);
-        } else {
-            // 显示指定模块的命令
-            showModuleCommands(*moduleManager_, args[0]);
-        }
-        return 0;
-    };
 }
 
 bool Builtins::isBuiltin(const std::string& name) const {
@@ -271,8 +253,4 @@ std::vector<std::string> Builtins::getNames() const {
 
 void Builtins::setExitFlag(bool* flag) {
     exitFlag_ = flag;
-}
-
-void Builtins::setModuleManager(ModuleManager* mgr) {
-    moduleManager_ = mgr;
 }
