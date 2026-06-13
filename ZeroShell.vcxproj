@@ -168,6 +168,7 @@
     <ClCompile Include="src\modules\ti_module.cpp" />
     <ClCompile Include="src\modules\privilege_module.cpp" />
     <ClCompile Include="src\modules\zs_setting_module.cpp" />
+    <ClCompile Include="src\modules\typing_module.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\shell.h" />
@@ -186,6 +187,7 @@
     <ClInclude Include="src\modules\ti_module.h" />
     <ClInclude Include="src\modules\privilege_module.h" />
     <ClInclude Include="src\modules\zs_setting_module.h" />
+    <ClInclude Include="src\modules\typing_module.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

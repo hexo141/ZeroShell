@@ -14,6 +14,6 @@ public:
     bool execute(const std::string& cmd, const std::vector<std::string>& args) override;
 
 private:
-    void runTypingTest();
+    void runTypingTest(int difficulty);
     void showMenu();
 };

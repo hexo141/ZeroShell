@@ -14,6 +14,7 @@
 #include "modules/ti_module.h"
 #include "modules/privilege_module.h"
 #include "modules/zs_setting_module.h"
+#include "modules/typing_module.h"
 
 #include <iostream>
 #include <filesystem>
@@ -39,6 +40,7 @@ Shell::Shell()
     registry_->registerModule(std::make_unique<TiModule>());
     registry_->registerModule(std::make_unique<PrivilegeModule>());
     registry_->registerModule(std::make_unique<ZsSettingModule>());
+    registry_->registerModule(std::make_unique<TypingModule>());
 
     // 初始化模块
     registry_->initAll();
