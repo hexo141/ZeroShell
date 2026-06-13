@@ -13,6 +13,10 @@ public:
     // 注册一个模块（接管所有权）
     void registerModule(std::unique_ptr<Module> module);
 
+    // 生命周期管理
+    void initAll();
+    void shutdownAll();
+
     // 根据命令名查找模块
     Module* findModule(const std::string& commandName);
 
@@ -21,6 +25,14 @@ public:
 
     // 获取所有注册的命令名列表
     std::vector<std::string> getAllCommands() const;
+
+    // 获取所有模块信息（名称、描述、命令列表）
+    struct ModuleInfo {
+        std::string name;
+        std::string description;
+        std::vector<std::string> commands;
+    };
+    std::vector<ModuleInfo> getModuleList() const;
 
     // 补全支持
     std::vector<std::string> complete(const std::string& input, int& context);

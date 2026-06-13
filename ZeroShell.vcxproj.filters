@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="模块">
+      <UniqueIdentifier>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -27,7 +30,7 @@
     <ClCompile Include="src\executor.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="src\builtins.cpp">
+    <ClCompile Include="src\module_registry.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="src\completion.cpp">
@@ -38,6 +41,21 @@
     </ClCompile>
     <ClCompile Include="src\line_editor.cpp">
       <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\file_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\system_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\core_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\uac_bypass_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\system_token_module.cpp">
+      <Filter>模块</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -50,7 +68,10 @@
     <ClInclude Include="include\executor.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="include\builtins.h">
+    <ClInclude Include="include\module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\module_registry.h">
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="include\completion.h">
@@ -61,6 +82,24 @@
     </ClInclude>
     <ClInclude Include="include\line_editor.h">
       <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\file_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\system_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\core_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\uac_bypass_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\system_token_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ti_module.h">
+      <Filter>模块</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -75,6 +75,7 @@ bool LineEditor::handleTab(const std::string& prompt) {
     int context = 0;
     auto completions = completionCb_(currentLine_, context);
     if (completions.empty()) return false;
+    int zsCount = context; // number of ZeroShell commands
 
     if (completions.size() == 1) {
         size_t lastSpace = currentLine_.rfind(' ');
@@ -95,9 +96,9 @@ bool LineEditor::handleTab(const std::string& prompt) {
     std::string savedLine = currentLine_;
     int savedCursorPos = cursorPos_;
 
-    // Get prefix for completion
-    size_t lastSpace = currentLine_.rfind(' ');
-    std::string prefix = (lastSpace == std::string::npos) ? "" : currentLine_.substr(0, lastSpace + 1);
+    // Get prefix for completion (up to last space or path separator)
+    size_t lastSep = savedLine.find_last_of(" /\\");
+    std::string prefix = (lastSep == std::string::npos) ? "" : savedLine.substr(0, lastSep + 1);
 
     // Calculate menu position once
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -142,12 +143,15 @@ bool LineEditor::handleTab(const std::string& prompt) {
             SetConsoleCursorPosition(hOut_, pos);
 
             std::string item;
+            bool isZShell = (idx < zsCount);
             if (idx == selected) {
                 // Selected item: blue background, white text
                 item = "\x1b[48;2;0;120;215m\x1b[38;2;255;255;255m> " + completions[idx];
+                if (isZShell) item += "\x1b[48;2;0;120;215m\x1b[38;2;128;128;128m (ZeroShell)";
             } else {
                 // Normal item: white text
                 item = "\x1b[0m\x1b[38;2;255;255;255m> " + completions[idx];
+                if (isZShell) item += "\x1b[0m\x1b[38;2;128;128;128m (ZeroShell)";
             }
 
             int padding = consoleWidth_ - static_cast<int>(item.length());
@@ -240,12 +244,36 @@ bool LineEditor::handleTab(const std::string& prompt) {
                 fastRedraw();
             }
         } else if (vk == VK_RETURN || vk == VK_TAB) {
-            // Confirm selection
-            clearMenu();
             if (!completions.empty()) {
-                currentLine_ = prefix + completions[selected] + " ";
+                std::string selectedItem = completions[selected];
+                currentLine_ = prefix + selectedItem;
+                cursorPos_ = static_cast<int>(currentLine_.size());
+
+                // If selected item is a directory (ends with /), auto-continue
+                if (!selectedItem.empty() && selectedItem.back() == '/') {
+                    int newContext = 0;
+                    auto newCompletions = completionCb_(currentLine_, newContext);
+                    if (newCompletions.empty()) {
+                        clearMenu();
+                        redrawLine(prompt);
+                        return vk == VK_RETURN;
+                    }
+                    completions = std::move(newCompletions);
+                    zsCount = newContext;
+                    selected = 0;
+                    scrollOffset = 0;
+                    // Recalculate prefix: everything before last space or path separator
+                    size_t sep = currentLine_.find_last_of(" /\\");
+                    prefix = (sep == std::string::npos) ? "" : currentLine_.substr(0, sep + 1);
+                    fastRedraw();
+                    continue;
+                }
+
+                // File or command: add trailing space and finish
+                currentLine_ += " ";
                 cursorPos_ = static_cast<int>(currentLine_.size());
             }
+            clearMenu();
             redrawLine(prompt);
             return vk == VK_RETURN;
         } else if (vk == VK_ESCAPE) {
@@ -270,6 +298,7 @@ bool LineEditor::handleTab(const std::string& prompt) {
                     redrawLine(prompt);
                 } else {
                     completions = std::move(newCompletions);
+                    zsCount = newContext;
                     selected = 0;
                     scrollOffset = 0;
                     fastRedraw();
@@ -289,6 +318,7 @@ bool LineEditor::handleTab(const std::string& prompt) {
                 redrawLine(prompt);
             } else {
                 completions = std::move(newCompletions);
+                zsCount = newContext;
                 selected = 0;
                 scrollOffset = 0;
                 fastRedraw();

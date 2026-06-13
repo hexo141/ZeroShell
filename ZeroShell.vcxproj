@@ -81,7 +81,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include\;src\modules\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -101,7 +101,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include\;src\modules\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -119,7 +119,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include\;src\modules\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -139,7 +139,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>include\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include\;src\modules\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -156,19 +156,36 @@
     <ClCompile Include="src\shell.cpp" />
     <ClCompile Include="src\parser.cpp" />
     <ClCompile Include="src\executor.cpp" />
-    <ClCompile Include="src\builtins.cpp" />
+    <ClCompile Include="src\module_registry.cpp" />
     <ClCompile Include="src\completion.cpp" />
     <ClCompile Include="src\highlight.cpp" />
     <ClCompile Include="src\line_editor.cpp" />
+    <ClCompile Include="src\modules\file_module.cpp" />
+    <ClCompile Include="src\modules\system_module.cpp" />
+    <ClCompile Include="src\modules\core_module.cpp" />
+    <ClCompile Include="src\modules\uac_bypass_module.cpp" />
+    <ClCompile Include="src\modules\system_token_module.cpp" />
+    <ClCompile Include="src\modules\ti_module.cpp" />
+    <ClCompile Include="src\modules\privilege_module.cpp" />
+    <ClCompile Include="src\modules\zs_setting_module.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\shell.h" />
     <ClInclude Include="include\parser.h" />
     <ClInclude Include="include\executor.h" />
-    <ClInclude Include="include\builtins.h" />
+    <ClInclude Include="include\module.h" />
+    <ClInclude Include="include\module_registry.h" />
     <ClInclude Include="include\completion.h" />
     <ClInclude Include="include\highlight.h" />
     <ClInclude Include="include\line_editor.h" />
+    <ClInclude Include="src\modules\file_module.h" />
+    <ClInclude Include="src\modules\system_module.h" />
+    <ClInclude Include="src\modules\core_module.h" />
+    <ClInclude Include="src\modules\uac_bypass_module.h" />
+    <ClInclude Include="src\modules\system_token_module.h" />
+    <ClInclude Include="src\modules\ti_module.h" />
+    <ClInclude Include="src\modules\privilege_module.h" />
+    <ClInclude Include="src\modules\zs_setting_module.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

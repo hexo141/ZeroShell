@@ -6,10 +6,10 @@
 
 class Parser;
 class Executor;
-class Builtins;
 class Completion;
 class Highlight;
 class LineEditor;
+class ModuleRegistry;
 
 class Shell {
 public:
@@ -21,7 +21,7 @@ public:
 private:
     std::unique_ptr<Parser> parser_;
     std::unique_ptr<Executor> executor_;
-    std::unique_ptr<Builtins> builtins_;
+    std::unique_ptr<ModuleRegistry> registry_;
     std::unique_ptr<Completion> completion_;
     std::unique_ptr<Highlight> highlight_;
     std::unique_ptr<LineEditor> editor_;
