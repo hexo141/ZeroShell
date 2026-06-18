@@ -15,6 +15,9 @@
 #include "modules/privilege_module.h"
 #include "modules/zs_setting_module.h"
 #include "modules/typing_module.h"
+#include "modules/anti_capture_module.h"
+#include "modules/liquid_module.h"
+#include "modules/driver_module.h"
 
 #include <iostream>
 #include <filesystem>
@@ -41,6 +44,9 @@ Shell::Shell()
     registry_->registerModule(std::make_unique<PrivilegeModule>());
     registry_->registerModule(std::make_unique<ZsSettingModule>());
     registry_->registerModule(std::make_unique<TypingModule>());
+    registry_->registerModule(std::make_unique<AntiCaptureModule>());
+    registry_->registerModule(std::make_unique<LiquidModule>());
+    registry_->registerModule(std::make_unique<DriverModule>());
 
     // 初始化模块
     registry_->initAll();

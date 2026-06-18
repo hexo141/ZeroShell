@@ -57,6 +57,14 @@
     <ClCompile Include="src\modules\system_token_module.cpp">
       <Filter>模块</Filter>
     </ClCompile>
+    <ClCompile Include="src\modules\driver_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="res\resource.rc">
+      <Filter>资源文件</Filter>
+    </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\shell.h">
@@ -99,6 +107,9 @@
       <Filter>模块</Filter>
     </ClInclude>
     <ClInclude Include="src\modules\ti_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\driver_module.h">
       <Filter>模块</Filter>
     </ClInclude>
   </ItemGroup>

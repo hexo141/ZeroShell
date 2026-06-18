@@ -1,0 +1,3 @@
+#include "resource.h"
+
+IDR_RTCORE64_SYS  RCDATA  "RTCore64.sys"

