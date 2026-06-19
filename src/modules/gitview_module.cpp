@@ -3,10 +3,18 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <thread>
+#include <mutex>
+#include <memory>
+#include <unordered_set>
+#include <cstdlib>
+#include <ctime>
 #include <windows.h>
+#include <mmsystem.h>
 #include <tlhelp32.h>
 
 #pragma comment(lib, "ntdll.lib")
+#pragma comment(lib, "winmm.lib")
 
 typedef LONG NTSTATUS;
 
@@ -157,7 +165,240 @@ static std::vector<std::pair<DWORD, std::wstring>> enumGitProcesses() {
     return result;
 }
 
+// ─── Danmaku ─────────────────────────────────────────────────────────────────
+
+static std::mutex g_gitDanmakuMutex;
+static HWND g_gitDanmakuWnd = nullptr;
+
+struct GitDanmakuItem {
+    double x;
+    int y;
+    double speed;
+    COLORREF color;
+    std::wstring text;
+    DWORD pid;
+};
+
+struct GitDanmakuData {
+    std::vector<GitDanmakuItem> items;
+    int screenW, screenH;
+    HDC memDC;
+    HBITMAP memBmp;
+    HFONT hFont;
+    void* bits;
+    BITMAPINFO bmi;
+    bool running;
+};
+
+static std::wstring utf8ToWide(const std::string& utf8) {
+    if (utf8.empty()) return {};
+    int len = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), nullptr, 0);
+    std::wstring result(len, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), (int)utf8.size(), &result[0], len);
+    return result;
+}
+
+static LRESULT CALLBACK GitDanmakuWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_DESTROY) {
+        auto data = (GitDanmakuData*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+        if (data) {
+            data->running = false;
+            DeleteObject(data->hFont);
+            DeleteObject(data->memBmp);
+            DeleteDC(data->memDC);
+        }
+        std::lock_guard<std::mutex> lock(g_gitDanmakuMutex);
+        g_gitDanmakuWnd = nullptr;
+        PostQuitMessage(0);
+        return 0;
+    }
+    if (msg == WM_CLOSE) {
+        DestroyWindow(hWnd);
+        return 0;
+    }
+    return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+static void gitDanmakuThread() {
+    srand((unsigned int)time(nullptr) ^ (unsigned int)GetCurrentThreadId());
+    timeBeginPeriod(1);
+
+    HINSTANCE hInst = GetModuleHandle(nullptr);
+
+    WNDCLASSEXW wc = {};
+    wc.cbSize = sizeof(WNDCLASSEXW);
+    wc.lpfnWndProc = GitDanmakuWndProc;
+    wc.hInstance = hInst;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.lpszClassName = L"GitDanmakuClass";
+    if (!RegisterClassExW(&wc)) { timeEndPeriod(1); return; }
+
+    int screenW = GetSystemMetrics(SM_CXSCREEN);
+    int screenH = GetSystemMetrics(SM_CYSCREEN);
+
+    auto data = std::make_unique<GitDanmakuData>();
+    data->screenW = screenW;
+    data->screenH = screenH;
+    data->running = true;
+
+    HWND hWnd = CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        L"GitDanmakuClass", L"GitView",
+        WS_POPUP,
+        0, 0, screenW, screenH,
+        nullptr, nullptr, hInst, data.get());
+
+    if (!hWnd) {
+        UnregisterClassW(L"GitDanmakuClass", hInst);
+        timeEndPeriod(1);
+        return;
+    }
+
+    HDC hdc = GetDC(hWnd);
+    data->memDC = CreateCompatibleDC(hdc);
+    data->bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    data->bmi.bmiHeader.biWidth = screenW;
+    data->bmi.bmiHeader.biHeight = -screenH;
+    data->bmi.bmiHeader.biPlanes = 1;
+    data->bmi.bmiHeader.biBitCount = 32;
+    data->bmi.bmiHeader.biCompression = BI_RGB;
+    data->memBmp = CreateDIBSection(data->memDC, &data->bmi, DIB_RGB_COLORS, &data->bits, nullptr, 0);
+    SelectObject(data->memDC, data->memBmp);
+    data->hFont = CreateFontW(22, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        ANTIALIASED_QUALITY, DEFAULT_PITCH, L"Consolas");
+    ReleaseDC(hWnd, hdc);
+
+    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)data.get());
+
+    {
+        std::lock_guard<std::mutex> lock(g_gitDanmakuMutex);
+        g_gitDanmakuWnd = hWnd;
+    }
+
+    ShowWindow(hWnd, SW_SHOW);
+
+    BLENDFUNCTION blend = {};
+    blend.BlendOp = AC_SRC_OVER;
+    blend.SourceConstantAlpha = 220;
+    blend.AlphaFormat = AC_SRC_ALPHA;
+    SIZE winSize = { screenW, screenH };
+    POINT zero = { 0, 0 };
+
+    LARGE_INTEGER freq, lastTime;
+    QueryPerformanceFrequency(&freq);
+    QueryPerformanceCounter(&lastTime);
+
+    MSG msg = {};
+    int enumCounter = 0;
+
+    while (data->running) {
+        while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) {
+                data->running = false;
+                break;
+            }
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        if (!data->running) break;
+
+        LARGE_INTEGER now;
+        QueryPerformanceCounter(&now);
+        double dt = (double)(now.QuadPart - lastTime.QuadPart) / freq.QuadPart;
+        lastTime = now;
+        if (dt > 0.05) dt = 0.05;
+
+        enumCounter++;
+        if (enumCounter >= 50) {
+            enumCounter = 0;
+
+            auto processes = enumGitProcesses();
+            std::unordered_set<DWORD> existingPids;
+            for (const auto& item : data->items)
+                existingPids.insert(item.pid);
+
+            for (const auto& p : processes) {
+                if (existingPids.find(p.first) != existingPids.end()) continue;
+
+                std::string cmdLineUtf8 = wideToUtf8(p.second);
+                std::string args = stripExePath(cmdLineUtf8);
+                if (args.empty()) args = "(no args)";
+                if (args.length() > 60)
+                    args = args.substr(0, 57) + "...";
+                std::wstring displayText = L"PID " + std::to_wstring(p.first) + L"  git " + utf8ToWide(args);
+
+                GitDanmakuItem item;
+                item.x = (double)(screenW + rand() % 200);
+                item.y = 30 + rand() % (screenH - 120);
+                item.speed = 200.0 + (rand() % 200);
+                item.color = RGB(55 + rand() % 200, 55 + rand() % 200, 55 + rand() % 200);
+                item.text = displayText;
+                item.pid = p.first;
+                data->items.push_back(item);
+            }
+        }
+
+        for (auto& item : data->items) {
+            item.x -= item.speed * dt;
+            if (item.x + 800 < 0) {
+                item.x = (double)(screenW + rand() % 200);
+                item.y = 30 + rand() % (screenH - 120);
+                item.speed = 200.0 + (rand() % 200);
+                item.color = RGB(55 + rand() % 200, 55 + rand() % 200, 55 + rand() % 200);
+            }
+        }
+
+        RECT rc = { 0, 0, screenW, screenH };
+        HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
+        FillRect(data->memDC, &rc, blackBrush);
+
+        SetBkMode(data->memDC, TRANSPARENT);
+        HFONT oldFont = (HFONT)SelectObject(data->memDC, data->hFont);
+
+        for (const auto& item : data->items) {
+            SetTextColor(data->memDC, item.color);
+            TextOutW(data->memDC, (int)item.x, item.y, item.text.c_str(), (int)item.text.length());
+        }
+
+        SelectObject(data->memDC, oldFont);
+
+        uint32_t* pixels = (uint32_t*)data->bits;
+        int total = screenW * screenH;
+        for (int i = 0; i < total; i++) {
+            uint32_t p = pixels[i];
+            uint8_t b = p & 0xFF;
+            uint8_t g = (p >> 8) & 0xFF;
+            uint8_t r = (p >> 16) & 0xFF;
+            if (r || g || b) {
+                uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
+                pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
+            }
+        }
+
+        UpdateLayeredWindow(hWnd, nullptr, nullptr, &winSize, data->memDC, &zero, 0, &blend, ULW_ALPHA);
+
+        double frameTime = (double)(now.QuadPart - lastTime.QuadPart) / freq.QuadPart;
+        double targetFrameTime = 1.0 / 144.0;
+        if (frameTime < targetFrameTime) {
+            int sleepMs = (int)((targetFrameTime - frameTime) * 1000);
+            if (sleepMs > 0) Sleep(sleepMs);
+        }
+    }
+
+    if (IsWindow(hWnd)) DestroyWindow(hWnd);
+    UnregisterClassW(L"GitDanmakuClass", hInst);
+    timeEndPeriod(1);
+}
+
 // ─── 模块接口 ────────────────────────────────────────────────────────────────
+
+void GitViewModule::shutdown() {
+    std::lock_guard<std::mutex> lock(g_gitDanmakuMutex);
+    if (g_gitDanmakuWnd) {
+        PostMessage(g_gitDanmakuWnd, WM_CLOSE, 0, 0);
+    }
+}
 
 std::vector<std::string> GitViewModule::getCommands() const {
     return { "gitview" };
@@ -165,6 +406,27 @@ std::vector<std::string> GitViewModule::getCommands() const {
 
 bool GitViewModule::execute(const std::string& cmd, const std::vector<std::string>& args) {
     if (cmd != "gitview") return false;
+
+    bool danmakuMode = false;
+    for (const auto& arg : args) {
+        if (arg == "-d" || arg == "--danmaku") {
+            danmakuMode = true;
+            break;
+        }
+    }
+
+    if (danmakuMode) {
+        std::lock_guard<std::mutex> lock(g_gitDanmakuMutex);
+        if (g_gitDanmakuWnd) {
+            PostMessage(g_gitDanmakuWnd, WM_CLOSE, 0, 0);
+            std::cout << "GitView danmaku stopped.\n";
+        } else {
+            std::thread(gitDanmakuThread).detach();
+            std::cout << "\x1b[38;2;0;200;255mGitView Danmaku started.\x1b[0m\n";
+            std::cout << "Type 'gitview -d' again to stop.\n";
+        }
+        return true;
+    }
 
     g_gitViewCancelled = false;
     SetConsoleCtrlHandler(GitViewCtrlHandler, TRUE);
