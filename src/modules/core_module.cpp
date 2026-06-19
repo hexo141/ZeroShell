@@ -26,6 +26,7 @@ bool CoreModule::execute(const std::string& cmd, const std::vector<std::string>&
         std::cout << "  modules  List all modules\n";
         std::cout << "  zssetting ZeroShell settings menu\n";
         std::cout << "  typing       Typing practice and speed test\n";
+        std::cout << "  ffind        Fast file search (NTFS MFT or multithreaded)\n";
         std::cout << "  anticapture  Anti screen-capture via shellcode injection\n";
         std::cout << "  exit     Exit the shell\n";
         std::cout << "  help     Show this help\n";

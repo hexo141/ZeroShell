@@ -5,6 +5,7 @@
 #include "completion.h"
 #include "highlight.h"
 #include "line_editor.h"
+#include "terminal_printer.h"
 
 #include "modules/file_module.h"
 #include "modules/system_module.h"
@@ -18,10 +19,36 @@
 #include "modules/anti_capture_module.h"
 #include "modules/liquid_module.h"
 #include "modules/driver_module.h"
+#include "modules/fastfind_module.h"
+#include "modules/fileop_module.h"
+#include "modules/ciallo_module.h"
+#include "modules/gitview_module.h"
+#include "modules/tray_module.h"
 
 #include <iostream>
 #include <filesystem>
 #include <cstdlib>
+#include <windows.h>
+
+// ─── 控制台窗口关闭拦截 ─────────────────────────────────────────────────────
+static WNDPROC g_originalConsoleWndProc = nullptr;
+
+static LRESULT CALLBACK ConsoleWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_CLOSE) {
+        return 0;
+    }
+    if (msg == WM_SYSCOMMAND && (wParam & 0xFFF0) == SC_CLOSE) {
+        return 0;
+    }
+    return CallWindowProc(g_originalConsoleWndProc, hWnd, msg, wParam, lParam);
+}
+
+static BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
+    if (dwCtrlType == CTRL_C_EVENT || dwCtrlType == CTRL_CLOSE_EVENT) {
+        return TRUE;
+    }
+    return FALSE;
+}
 
 Shell::Shell()
     : parser_(std::make_unique<Parser>())
@@ -30,6 +57,20 @@ Shell::Shell()
     , completion_(std::make_unique<Completion>(*registry_))
     , highlight_(std::make_unique<Highlight>())
     , editor_(std::make_unique<LineEditor>()) {
+
+    // Intercept std::cout to underline URLs / file paths
+    TerminalPrinter::instance().install();
+
+    // 禁用关闭按钮、任务栏关闭、WM_CLOSE
+    HWND hConsole = GetConsoleWindow();
+    if (hConsole) {
+        HMENU hSysMenu = GetSystemMenu(hConsole, FALSE);
+        if (hSysMenu) {
+            DeleteMenu(hSysMenu, SC_CLOSE, MF_BYCOMMAND);
+        }
+        g_originalConsoleWndProc = (WNDPROC)SetWindowLongPtr(hConsole, GWLP_WNDPROC, (LONG_PTR)ConsoleWndProc);
+    }
+    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
     // 注册模块
     auto coreModule = std::make_unique<CoreModule>();
@@ -47,6 +88,13 @@ Shell::Shell()
     registry_->registerModule(std::make_unique<AntiCaptureModule>());
     registry_->registerModule(std::make_unique<LiquidModule>());
     registry_->registerModule(std::make_unique<DriverModule>());
+    registry_->registerModule(std::make_unique<FastFindModule>());
+    registry_->registerModule(std::make_unique<FileOpModule>());
+    registry_->registerModule(std::make_unique<CialloModule>());
+    registry_->registerModule(std::make_unique<GitViewModule>());
+    auto trayModule = std::make_unique<TrayModule>();
+    trayModule->setExitFlag(&running_);
+    registry_->registerModule(std::move(trayModule));
 
     // 初始化模块
     registry_->initAll();
@@ -104,6 +152,7 @@ Shell::~Shell() {
     }
 
     registry_->shutdownAll();
+    TerminalPrinter::instance().uninstall();
 }
 
 void Shell::run() {
@@ -118,6 +167,16 @@ void Shell::run() {
 
     while (running_) {
         std::string line = editor_->readLine(getPrompt());
+        if (editor_->wasCtrlCPressed()) {
+            editor_->resetCtrlCPressed();
+            std::cout << "Are you sure you want to exit? (y/N): ";
+            std::string response;
+            std::getline(std::cin, response);
+            if (!response.empty() && (response[0] == 'y' || response[0] == 'Y')) {
+                running_ = false;
+            }
+            continue;
+        }
         if (line.empty()) continue;
 
         editor_->historyAdd(line);

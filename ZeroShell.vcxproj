@@ -172,6 +172,12 @@
     <ClCompile Include="src\modules\anti_capture_module.cpp" />
     <ClCompile Include="src\modules\liquid_module.cpp" />
     <ClCompile Include="src\modules\driver_module.cpp" />
+    <ClCompile Include="src\modules\fastfind_module.cpp" />
+    <ClCompile Include="src\modules\fileop_module.cpp" />
+    <ClCompile Include="src\modules\ciallo_module.cpp" />
+    <ClCompile Include="src\modules\gitview_module.cpp" />
+    <ClCompile Include="src\modules\tray_module.cpp" />
+    <ClCompile Include="src\terminal_printer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="res\resource.rc" />
@@ -197,6 +203,11 @@
     <ClInclude Include="src\modules\anti_capture_module.h" />
     <ClInclude Include="src\modules\liquid_module.h" />
     <ClInclude Include="src\modules\driver_module.h" />
+    <ClInclude Include="src\modules\fastfind_module.h" />
+    <ClInclude Include="src\modules\ciallo_module.h" />
+    <ClInclude Include="src\modules\tray_module.h" />
+    <ClInclude Include="include\modules\fileop_module.h" />
+    <ClInclude Include="include\terminal_printer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

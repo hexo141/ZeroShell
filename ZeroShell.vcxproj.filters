@@ -60,6 +60,9 @@
     <ClCompile Include="src\modules\driver_module.cpp">
       <Filter>模块</Filter>
     </ClCompile>
+    <ClCompile Include="src\terminal_printer.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="res\resource.rc">
@@ -111,6 +114,9 @@
     </ClInclude>
     <ClInclude Include="src\modules\driver_module.h">
       <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="include\terminal_printer.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

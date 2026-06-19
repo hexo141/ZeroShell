@@ -1,16 +1,38 @@
 #include "line_editor.h"
+#include "terminal_printer.h"
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+
+// UTF-8: 回退到上一个字符的起始位置
+static size_t utf8PrevChar(const std::string& s, size_t pos) {
+    if (pos == 0) return 0;
+    size_t i = pos - 1;
+    // 10xxxxxx 是后续字节，回退到首个非后续字节
+    while (i > 0 && (static_cast<unsigned char>(s[i]) & 0xC0) == 0x80) i--;
+    return i;
+}
 
 LineEditor::LineEditor() {
     hIn_ = GetStdHandle(STD_INPUT_HANDLE);
     hOut_ = GetStdHandle(STD_OUTPUT_HANDLE);
 
+    // Set console to UTF-8 code page so Chinese input/output works
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+
     // Enable virtual terminal processing for ANSI colors
     DWORD mode;
     GetConsoleMode(hOut_, &mode);
     SetConsoleMode(hOut_, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+
+    // Enable mouse input for Ctrl+Click link handling
+    // Disable Quick Edit to prevent it from eating mouse events
+    DWORD inMode;
+    GetConsoleMode(hIn_, &inMode);
+    inMode |= ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS;
+    inMode &= ~ENABLE_QUICK_EDIT_MODE;
+    SetConsoleMode(hIn_, inMode);
 }
 
 LineEditor::~LineEditor() = default;
@@ -217,11 +239,19 @@ bool LineEditor::handleTab(const std::string& prompt) {
         INPUT_RECORD rec;
         DWORD read;
         ReadConsoleInput(hIn_, &rec, 1, &read);
+        if (rec.EventType == MOUSE_EVENT) {
+            auto& mouse = rec.Event.MouseEvent;
+            if (mouse.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED &&
+                (mouse.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))) {
+                TerminalPrinter::instance().handleClick(mouse.dwMousePosition.X, mouse.dwMousePosition.Y);
+            }
+            continue;
+        }
         if (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown) continue;
 
         auto& key = rec.Event.KeyEvent;
         WORD vk = key.wVirtualKeyCode;
-        char ch = key.uChar.AsciiChar;
+        wchar_t wch = key.uChar.UnicodeChar;
 
         if (vk == VK_UP) {
             if (!completions.empty() && selected > 0) {
@@ -285,9 +315,10 @@ bool LineEditor::handleTab(const std::string& prompt) {
             redrawLine(prompt);
         } else if (vk == VK_BACK) {
             // Delete last char and refresh completions
-            if (!currentLine_.empty()) {
-                currentLine_.erase(currentLine_.size() - 1);
-                cursorPos_ = static_cast<int>(currentLine_.size());
+            if (!currentLine_.empty() && cursorPos_ > 0) {
+                size_t prev = utf8PrevChar(currentLine_, cursorPos_);
+                currentLine_.erase(prev, cursorPos_ - prev);
+                cursorPos_ = static_cast<int>(prev);
 
                 // Refresh completions based on new input
                 int newContext = 0;
@@ -304,10 +335,14 @@ bool LineEditor::handleTab(const std::string& prompt) {
                     fastRedraw();
                 }
             }
-        } else if (ch >= ' ' && ch != '\t') {
+        } else if (wch >= L' ' && wch != L'\t') {
             // Typing a character: add to line and refresh completions
-            currentLine_.insert(cursorPos_, 1, ch);
-            cursorPos_++;
+            char utf8Buf[8] = {0};
+            int len = WideCharToMultiByte(CP_UTF8, 0, &wch, 1, utf8Buf, sizeof(utf8Buf), nullptr, nullptr);
+            if (len > 0) {
+                currentLine_.insert(cursorPos_, utf8Buf, len);
+                cursorPos_ += len;
+            }
 
             // Refresh completions based on new input
             int newContext = 0;
@@ -333,6 +368,7 @@ std::string LineEditor::readLine(const std::string& prompt) {
     currentLine_.clear();
     cursorPos_ = 0;
     historyIndex_ = -1;
+    ctrlCPressed_ = false;
 
     // Get console width
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -349,17 +385,29 @@ std::string LineEditor::readLine(const std::string& prompt) {
     WriteConsoleA(hOut_, promptOutput.c_str(), static_cast<DWORD>(promptOutput.size()), &written, nullptr);
 
     // Disable line input and echo so we handle everything ourselves
-    SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT);
+    SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS);
 
     while (true) {
         INPUT_RECORD rec;
         DWORD read;
         ReadConsoleInput(hIn_, &rec, 1, &read);
+        if (rec.EventType == MOUSE_EVENT) {
+            auto& mouse = rec.Event.MouseEvent;
+            // Only handle Ctrl+Left button down
+            if (mouse.dwButtonState == FROM_LEFT_1ST_BUTTON_PRESSED &&
+                (mouse.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))) {
+                if (TerminalPrinter::instance().handleClick(mouse.dwMousePosition.X, mouse.dwMousePosition.Y)) {
+                    // Link was clicked — briefly flash to indicate action
+                    // (no extra feedback needed, ShellExecute already launched)
+                }
+            }
+            continue;
+        }
         if (rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown) continue;
 
         auto& key = rec.Event.KeyEvent;
         WORD vk = key.wVirtualKeyCode;
-        char ch = key.uChar.AsciiChar;
+        wchar_t wch = key.uChar.UnicodeChar;
 
         if (vk == VK_RETURN) {
             // Move to end of line and newline
@@ -373,19 +421,22 @@ std::string LineEditor::readLine(const std::string& prompt) {
             SetConsoleCursorPosition(hOut_, endCursor);
             std::cout << "\n";
 
-            SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT);
+            SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS);
             return currentLine_;
 
         } else if (vk == VK_BACK) {
             if (cursorPos_ > 0) {
-                currentLine_.erase(cursorPos_ - 1, 1);
-                cursorPos_--;
+                size_t prev = utf8PrevChar(currentLine_, cursorPos_);
+                currentLine_.erase(prev, cursorPos_ - prev);
+                cursorPos_ = static_cast<int>(prev);
                 redrawLine(prompt);
             }
 
         } else if (vk == VK_DELETE) {
             if (cursorPos_ < static_cast<int>(currentLine_.size())) {
-                currentLine_.erase(cursorPos_, 1);
+                size_t next = cursorPos_ + 1;
+                while (next < currentLine_.size() && (static_cast<unsigned char>(currentLine_[next]) & 0xC0) == 0x80) next++;
+                currentLine_.erase(cursorPos_, next - cursorPos_);
                 redrawLine(prompt);
             }
 
@@ -463,10 +514,20 @@ std::string LineEditor::readLine(const std::string& prompt) {
             COORD pos = { x, y };
             SetConsoleCursorPosition(hOut_, pos);
 
-        } else if (ch >= ' ' && ch != '\t') {
-            currentLine_.insert(cursorPos_, 1, ch);
-            cursorPos_++;
-            redrawLine(prompt);
+        } else if (vk == 'C' && (key.dwControlKeyState & (LEFT_CTRL_PRESSED | RIGHT_CTRL_PRESSED))) {
+            ctrlCPressed_ = true;
+            std::cout << "\n";
+            SetConsoleMode(hIn_, ENABLE_PROCESSED_INPUT | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS);
+            return currentLine_;
+
+        } else if (wch >= L' ' && wch != L'\t') {
+            char utf8Buf[8] = {0};
+            int len = WideCharToMultiByte(CP_UTF8, 0, &wch, 1, utf8Buf, sizeof(utf8Buf), nullptr, nullptr);
+            if (len > 0) {
+                currentLine_.insert(cursorPos_, utf8Buf, len);
+                cursorPos_ += len;
+                redrawLine(prompt);
+            }
         }
     }
 }

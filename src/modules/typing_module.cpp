@@ -199,6 +199,7 @@ void TypingModule::runTypingTest(int difficulty) {
     int total = (int)target.size();
 
     std::string input;
+    int errors = 0;
     bool started = false;
     auto startTime = std::chrono::steady_clock::now();
 
@@ -314,6 +315,13 @@ void TypingModule::runTypingTest(int difficulty) {
                 started = true;
                 startTime = std::chrono::steady_clock::now();
             }
+            // Count real-time wrong key presses
+            if (input.size() < target.size()) {
+                if (ch != target[input.size()]) errors++;
+            } else {
+                // Typing beyond target length is always wrong
+                errors++;
+            }
             input += ch;
             drawTarget();
             drawInput();
@@ -331,10 +339,6 @@ void TypingModule::runTypingTest(int difficulty) {
     for (int i = 0; i < compareLen; ++i) {
         if (input[i] == target[i]) correct++;
     }
-
-    int errors = compareLen - correct;
-    if (inputLen < total) errors += total - inputLen;
-    if (inputLen > total) errors += inputLen - total;
 
     double accuracy = total > 0 ? (double)correct / total * 100.0 : 0.0;
     double minutes = elapsedSec / 60.0;

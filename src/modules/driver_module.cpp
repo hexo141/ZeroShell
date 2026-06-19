@@ -117,16 +117,16 @@ void DriverModule::showMethodMenu() {
     GetConsoleMode(hIn, &prevMode);
     SetConsoleMode(hIn, ENABLE_EXTENDED_FLAGS | prevMode);
 
-    cout << "\n";
+    cout << "\n" << flush;
     int menuStart = getMenuStartY();
 
-    cout << "  \x1b[1;37mDriver Signature Bypass Methods\x1b[0m\n";
-    cout << "  \x1b[90m" << string(60, '-') << "\x1b[0m\n";
+    cout << "  \x1b[1;37mDriver Signature Bypass Methods\x1b[0m\n" << flush;
+    cout << "  \x1b[90m" << string(60, '-') << "\x1b[0m\n" << flush;
 
     int listStart = getMenuStartY();
 
-    cout << "\n  \x1b[90m" << string(60, '-') << "\x1b[0m\n";
-    cout << "  \x1b[90m[Up/Down] select  [Enter] execute  [Esc] cancel\x1b[0m\n";
+    cout << "\n  \x1b[90m" << string(60, '-') << "\x1b[0m\n" << flush;
+    cout << "  \x1b[90m[Up/Down] select  [Enter] execute  [Esc] cancel\x1b[0m\n" << flush;
 
     int descLine = getMenuStartY() + 1;
 
@@ -140,11 +140,11 @@ void DriverModule::showMethodMenu() {
             string suffix = (i == selected) ? " \x1b[0m" : "\x1b[0m";
             cout << prefix << nameColor << methods[i].name << suffix
                  << descColor << "  " << methods[i].desc << "\x1b[0m"
-                 << string(40, ' ');
+                 << string(40, ' ') << flush;
             ++y;
         }
         setCursorPos(0, descLine);
-        cout << "  \x1b[96m" << methods[selected].desc << "\x1b[0m" << string(40, ' ');
+        cout << "  \x1b[96m" << methods[selected].desc << "\x1b[0m" << string(40, ' ') << flush;
     };
 
     drawMenu();
@@ -166,10 +166,10 @@ void DriverModule::showMethodMenu() {
             int y = menuStart;
             for (int i = 0; i < methodCount + 6; ++i) {
                 setCursorPos(0, y + i);
-                cout << string(80, ' ');
+                cout << string(80, ' ') << flush;
             }
             setCursorPos(0, menuStart);
-            cout << "[*] Canceled.\n";
+            cout << "[*] Canceled.\n" << flush;
             SetConsoleMode(hIn, prevMode);
             return;
         }

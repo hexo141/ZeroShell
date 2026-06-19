@@ -154,16 +154,16 @@ void UacBypassModule::showMethodMenu(const std::string& command, bool exitAfter)
     GetConsoleMode(hIn, &prevMode);
     SetConsoleMode(hIn, ENABLE_EXTENDED_FLAGS | prevMode);
 
-    std::cout << "\n";
+    std::cout << "\n" << std::flush;
     int menuStart = getMenuStartY();
 
-    std::cout << "  \x1b[1;37mUAC Bypass Methods\x1b[0m\n";
-    std::cout << "  \x1b[90m" << std::string(50, '-') << "\x1b[0m\n";
+    std::cout << "  \x1b[1;37mUAC Bypass Methods\x1b[0m\n" << std::flush;
+    std::cout << "  \x1b[90m" << std::string(50, '-') << "\x1b[0m\n" << std::flush;
 
     int listStart = getMenuStartY();
 
-    std::cout << "\n  \x1b[90m" << std::string(50, '-') << "\x1b[0m\n";
-    std::cout << "  \x1b[90m[Up/Down] select  [Enter] execute  [Esc] cancel\x1b[0m\n";
+    std::cout << "\n  \x1b[90m" << std::string(50, '-') << "\x1b[0m\n" << std::flush;
+    std::cout << "  \x1b[90m[Up/Down] select  [Enter] execute  [Esc] cancel\x1b[0m\n" << std::flush;
 
     int descLine = getMenuStartY() + 1;
     auto drawMenu = [&]() {
@@ -176,11 +176,11 @@ void UacBypassModule::showMethodMenu(const std::string& command, bool exitAfter)
             std::string suffix = (i == selected) ? " \x1b[0m" : "\x1b[0m";
             std::cout << prefix << nameColor << methods[i].name << suffix
                       << descColor << "  " << methods[i].desc << "\x1b[0m"
-                      << std::string(40, ' ');
+                      << std::string(40, ' ') << std::flush;
             ++y;
         }
         setCursorPos(0, descLine);
-        std::cout << "  \x1b[96m" << methods[selected].desc << "\x1b[0m" << std::string(40, ' ');
+        std::cout << "  \x1b[96m" << methods[selected].desc << "\x1b[0m" << std::string(40, ' ') << std::flush;
     };
 
     drawMenu();
@@ -203,10 +203,10 @@ void UacBypassModule::showMethodMenu(const std::string& command, bool exitAfter)
             int y = menuStart;
             for (int i = 0; i < methodCount + 6; ++i) {
                 setCursorPos(0, y + i);
-                std::cout << std::string(80, ' ');
+                std::cout << std::string(80, ' ') << std::flush;
             }
             setCursorPos(0, menuStart);
-            std::cout << "[*] Canceled.\n";
+            std::cout << "[*] Canceled.\n" << std::flush;
             SetConsoleMode(hIn, prevMode);
             return;
         }

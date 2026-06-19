@@ -12,6 +12,8 @@ public:
     ~LineEditor();
 
     std::string readLine(const std::string& prompt);
+    bool wasCtrlCPressed() const { return ctrlCPressed_; }
+    void resetCtrlCPressed() { ctrlCPressed_ = false; }
 
     void historyAdd(const std::string& line);
     void historySave(const std::string& path);
@@ -35,6 +37,7 @@ private:
 
     std::string currentLine_;
     int cursorPos_ = 0;
+    bool ctrlCPressed_ = false;
 
     // Tracked line position
     SHORT promptStartX_ = 0;
