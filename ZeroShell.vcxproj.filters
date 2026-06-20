@@ -118,5 +118,8 @@
     <ClInclude Include="include\terminal_printer.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\modules\mtrail_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

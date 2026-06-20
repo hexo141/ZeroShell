@@ -177,6 +177,7 @@
     <ClCompile Include="src\modules\ciallo_module.cpp" />
     <ClCompile Include="src\modules\gitview_module.cpp" />
     <ClCompile Include="src\modules\tray_module.cpp" />
+    <ClCompile Include="src\modules\mtrail_module.cpp" />
     <ClCompile Include="src\terminal_printer.cpp" />
   </ItemGroup>
   <ItemGroup>

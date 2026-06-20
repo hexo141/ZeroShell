@@ -24,6 +24,7 @@
 #include "modules/ciallo_module.h"
 #include "modules/gitview_module.h"
 #include "modules/tray_module.h"
+#include "modules/mtrail_module.h"
 
 #include <iostream>
 #include <filesystem>
@@ -64,6 +65,7 @@ Shell::Shell()
     auto trayModule = std::make_unique<TrayModule>();
     trayModule->setExitFlag(&running_);
     registry_->registerModule(std::move(trayModule));
+    registry_->registerModule(std::make_unique<MtrailModule>());
 
     // 初始化模块
     registry_->initAll();
