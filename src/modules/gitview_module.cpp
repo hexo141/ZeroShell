@@ -168,6 +168,7 @@ static std::vector<std::pair<DWORD, std::wstring>> enumGitProcesses() {
 // ─── Danmaku ─────────────────────────────────────────────────────────────────
 
 static std::mutex g_gitDanmakuMutex;
+static std::mutex g_gitRandMutex;
 static HWND g_gitDanmakuWnd = nullptr;
 
 struct GitDanmakuItem {
@@ -339,40 +340,72 @@ static void gitDanmakuThread() {
             }
         }
 
-        for (auto& item : data->items) {
-            item.x -= item.speed * dt;
-            if (item.x + 800 < 0) {
-                item.x = (double)(screenW + rand() % 200);
-                item.y = 30 + rand() % (screenH - 120);
-                item.speed = 200.0 + (rand() % 200);
-                item.color = RGB(55 + rand() % 200, 55 + rand() % 200, 55 + rand() % 200);
+        // 4 线程并行更新弹幕位置
+        {
+            int count = (int)data->items.size();
+            if (count > 0) {
+                int chunk = count / 4;
+                auto worker = [&](int start, int end) {
+                    for (int i = start; i < end; i++) {
+                        auto& item = data->items[i];
+                        item.x -= item.speed * dt;
+                        if (item.x + 800 < 0) {
+                            std::lock_guard<std::mutex> lock(g_gitRandMutex);
+                            item.x = (double)(screenW + rand() % 200);
+                            item.y = 30 + rand() % (screenH - 120);
+                            item.speed = 200.0 + (rand() % 200);
+                            item.color = RGB(55 + rand() % 200, 55 + rand() % 200, 55 + rand() % 200);
+                        }
+                    }
+                };
+                std::thread t1(worker, 0, chunk);
+                std::thread t2(worker, chunk, 2 * chunk);
+                std::thread t3(worker, 2 * chunk, 3 * chunk);
+                std::thread t4(worker, 3 * chunk, count);
+                t1.join(); t2.join(); t3.join(); t4.join();
             }
         }
 
-        RECT rc = { 0, 0, screenW, screenH };
-        HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
-        FillRect(data->memDC, &rc, blackBrush);
+        // GDI 渲染（单线程）
+        {
+            RECT rc = { 0, 0, screenW, screenH };
+            HBRUSH blackBrush = (HBRUSH)GetStockObject(BLACK_BRUSH);
+            FillRect(data->memDC, &rc, blackBrush);
 
-        SetBkMode(data->memDC, TRANSPARENT);
-        HFONT oldFont = (HFONT)SelectObject(data->memDC, data->hFont);
+            SetBkMode(data->memDC, TRANSPARENT);
+            HFONT oldFont = (HFONT)SelectObject(data->memDC, data->hFont);
 
-        for (const auto& item : data->items) {
-            SetTextColor(data->memDC, item.color);
-            TextOutW(data->memDC, (int)item.x, item.y, item.text.c_str(), (int)item.text.length());
+            for (const auto& item : data->items) {
+                SetTextColor(data->memDC, item.color);
+                TextOutW(data->memDC, (int)item.x, item.y, item.text.c_str(), (int)item.text.length());
+            }
+
+            SelectObject(data->memDC, oldFont);
         }
 
-        SelectObject(data->memDC, oldFont);
-
-        uint32_t* pixels = (uint32_t*)data->bits;
-        int total = screenW * screenH;
-        for (int i = 0; i < total; i++) {
-            uint32_t p = pixels[i];
-            uint8_t b = p & 0xFF;
-            uint8_t g = (p >> 8) & 0xFF;
-            uint8_t r = (p >> 16) & 0xFF;
-            if (r || g || b) {
-                uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
-                pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
+        // 4 线程并行处理像素 alpha
+        {
+            int total = screenW * screenH;
+            if (total > 0) {
+                uint32_t* pixels = (uint32_t*)data->bits;
+                int chunk = total / 4;
+                auto worker = [&](int start, int end) {
+                    for (int i = start; i < end; i++) {
+                        uint32_t p = pixels[i];
+                        uint8_t b = p & 0xFF;
+                        uint8_t g = (p >> 8) & 0xFF;
+                        uint8_t r = (p >> 16) & 0xFF;
+                        if (r || g || b) {
+                            uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
+                            pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
+                        }
+                    }
+                };
+                std::thread t1(worker, 0, chunk);
+                std::thread t2(worker, chunk, 2 * chunk);
+                std::thread t3(worker, 2 * chunk, 3 * chunk);
+                std::thread t4(worker, 3 * chunk, total);
+                t1.join(); t2.join(); t3.join(); t4.join();
             }
         }
 

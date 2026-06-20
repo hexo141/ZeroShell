@@ -58,7 +58,8 @@ bool TypingModule::execute(const std::string& cmd, const std::vector<std::string
     if (cmd == "typing") {
         if (!args.empty() && args[0] == "test") {
             runTypingTest(1); // default medium
-        } else {
+        }
+        else {
             showMenu();
         }
         return true;
@@ -113,7 +114,7 @@ void TypingModule::showMenu() {
 
         std::string hide = "\x1b[?25l";
         WriteConsoleA(hOut, hide.c_str(), static_cast<DWORD>(hide.size()), &written, nullptr);
-    };
+        };
 
     draw();
 
@@ -127,11 +128,14 @@ void TypingModule::showMenu() {
         WORD vk = rec.Event.KeyEvent.wVirtualKeyCode;
         if (vk == VK_ESCAPE) {
             inMenu = false;
-        } else if (vk == VK_UP) {
+        }
+        else if (vk == VK_UP) {
             if (sel > 0) { sel--; draw(); }
-        } else if (vk == VK_DOWN) {
+        }
+        else if (vk == VK_DOWN) {
             if (sel < (int)items.size() - 1) { sel++; draw(); }
-        } else if (vk == VK_RETURN) {
+        }
+        else if (vk == VK_RETURN) {
             if (sel == 0) {
                 // Start test
                 // Clean up menu
@@ -156,11 +160,13 @@ void TypingModule::showMenu() {
                 menuStartY = csbi.dwCursorPosition.Y;
                 SetConsoleMode(hIn, ENABLE_PROCESSED_INPUT);
                 draw();
-            } else if (sel == 1) {
+            }
+            else if (sel == 1) {
                 // Cycle difficulty
                 difficulty = (difficulty + 1) % 3;
                 draw();
-            } else {
+            }
+            else {
                 inMenu = false;
             }
         }
@@ -234,12 +240,15 @@ void TypingModule::runTypingTest(int difficulty) {
                 if (i < (int)input.size()) {
                     if (input[i] == target[i]) {
                         s += "\x1b[38;2;0;255;0m"; // green = correct
-                    } else {
+                    }
+                    else {
                         s += "\x1b[38;2;255;80;80m"; // red = wrong
                     }
-                } else if (i == (int)input.size()) {
+                }
+                else if (i == (int)input.size()) {
                     s += "\x1b[48;2;80;80;80m\x1b[38;2;255;255;255m"; // highlight current
-                } else {
+                }
+                else {
                     s += "\x1b[38;2;128;128;128m"; // gray = not yet typed
                 }
                 s += target[i];
@@ -247,7 +256,7 @@ void TypingModule::runTypingTest(int difficulty) {
             s += "\x1b[0m\x1b[K";
             WriteConsoleA(hOut, s.c_str(), static_cast<DWORD>(s.size()), &written, nullptr);
         }
-    };
+        };
 
     auto drawInput = [&]() {
         for (int line = 0; line < targetLines; ++line) {
@@ -267,7 +276,8 @@ void TypingModule::runTypingTest(int difficulty) {
             for (int i = start; i < end; ++i) {
                 if (i < total && input[i] == target[i]) {
                     s += "\x1b[38;2;0;255;0m";
-                } else {
+                }
+                else {
                     s += "\x1b[38;2;255;80;80m";
                 }
                 s += input[i];
@@ -275,7 +285,7 @@ void TypingModule::runTypingTest(int difficulty) {
             s += "\x1b[0m\x1b[K";
             WriteConsoleA(hOut, s.c_str(), static_cast<DWORD>(s.size()), &written, nullptr);
         }
-    };
+        };
 
     drawTarget();
     drawInput();
@@ -302,15 +312,18 @@ void TypingModule::runTypingTest(int difficulty) {
             SetConsoleCursorPosition(hOut, endPos);
             SetConsoleMode(hIn, oldMode);
             return;
-        } else if (vk == VK_RETURN) {
+        }
+        else if (vk == VK_RETURN) {
             running = false;
-        } else if (vk == VK_BACK) {
+        }
+        else if (vk == VK_BACK) {
             if (!input.empty()) {
                 input.pop_back();
                 drawTarget();
                 drawInput();
             }
-        } else if (ch >= 32 && ch < 127) {
+        }
+        else if (ch >= 32 && ch < 127) {
             if (!started) {
                 started = true;
                 startTime = std::chrono::steady_clock::now();
@@ -318,7 +331,8 @@ void TypingModule::runTypingTest(int difficulty) {
             // Count real-time wrong key presses
             if (input.size() < target.size()) {
                 if (ch != target[input.size()]) errors++;
-            } else {
+            }
+            else {
                 // Typing beyond target length is always wrong
                 errors++;
             }
@@ -359,9 +373,11 @@ void TypingModule::runTypingTest(int difficulty) {
 
     if (accuracy >= 95.0) {
         std::cout << "\x1b[38;2;0;255;0m";
-    } else if (accuracy >= 80.0) {
+    }
+    else if (accuracy >= 80.0) {
         std::cout << "\x1b[38;2;255;255;0m";
-    } else {
+    }
+    else {
         std::cout << "\x1b[38;2;255;80;80m";
     }
 

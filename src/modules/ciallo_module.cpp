@@ -72,6 +72,7 @@ static void closeMp3() {
 
 static HWND g_hWnd = nullptr;
 static std::mutex g_wndMutex;
+static std::mutex g_randMutex;
 
 static const wchar_t kText[] = L"Ciallo\uFF5E(\u2220\u30FB\u03C9< )\u2312\u2605";
 
@@ -99,21 +100,6 @@ static void renderFrame(DanmakuData* data) {
     }
 
     SelectObject(data->memDC, oldFont);
-
-    // 设置每像素 alpha：非黑像素从亮度推导不透明度
-    // GDI 在黑色背景上反走样产生的 RGB 已经是预乘值，只需补上 alpha 通道
-    uint32_t* pixels = (uint32_t*)data->bits;
-    int total = data->screenW * data->screenH;
-    for (int i = 0; i < total; i++) {
-        uint32_t p = pixels[i];
-        uint8_t b = p & 0xFF;
-        uint8_t g = (p >> 8) & 0xFF;
-        uint8_t r = (p >> 16) & 0xFF;
-        if (r || g || b) {
-            uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
-            pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
-        }
-    }
 }
 
 static LRESULT CALLBACK DanmakuWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -232,6 +218,21 @@ static void danmakuThread() {
     POINT zero = {0, 0};
 
     renderFrame(data.get());
+    // 初始帧单线程处理像素 alpha
+    {
+        uint32_t* pixels = (uint32_t*)data->bits;
+        int total = screenW * screenH;
+        for (int i = 0; i < total; i++) {
+            uint32_t p = pixels[i];
+            uint8_t b = p & 0xFF;
+            uint8_t g = (p >> 8) & 0xFF;
+            uint8_t r = (p >> 16) & 0xFF;
+            if (r || g || b) {
+                uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
+                pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
+            }
+        }
+    }
     UpdateLayeredWindow(hWnd, nullptr, nullptr, &winSize, data->memDC, &zero, 0, &blend, ULW_ALPHA);
 
     MSG msg = {};
@@ -254,14 +255,29 @@ static void danmakuThread() {
         lastTime = now;
         if (dt > 0.05) dt = 0.05;
 
-        // 更新所有弹幕位置
-        for (auto& item : data->items) {
-            item.x -= item.speed * dt;
-            if (item.x + 400 < 0) {
-                item.x = (double)(screenW + rand() % 200);
-                item.y = 30 + rand() % (screenH - 120);
-                item.speed = 250.0 + (rand() % 350);
-                item.color = randomBrightColor();
+        // 4 线程并行更新弹幕位置
+        {
+            int count = (int)data->items.size();
+            if (count > 0) {
+                int chunk = count / 4;
+                auto worker = [&](int start, int end) {
+                    for (int i = start; i < end; i++) {
+                        auto& item = data->items[i];
+                        item.x -= item.speed * dt;
+                        if (item.x + 400 < 0) {
+                            std::lock_guard<std::mutex> lock(g_randMutex);
+                            item.x = (double)(screenW + rand() % 200);
+                            item.y = 30 + rand() % (screenH - 120);
+                            item.speed = 250.0 + (rand() % 350);
+                            item.color = randomBrightColor();
+                        }
+                    }
+                };
+                std::thread t1(worker, 0, chunk);
+                std::thread t2(worker, chunk, 2 * chunk);
+                std::thread t3(worker, 2 * chunk, 3 * chunk);
+                std::thread t4(worker, 3 * chunk, count);
+                t1.join(); t2.join(); t3.join(); t4.join();
             }
         }
 
@@ -281,8 +297,35 @@ static void danmakuThread() {
             }
         }
 
-        // 渲染
+        // GDI 渲染（单线程）
         renderFrame(data.get());
+
+        // 4 线程并行处理像素 alpha
+        {
+            int total = screenW * screenH;
+            if (total > 0) {
+                uint32_t* pixels = (uint32_t*)data->bits;
+                int chunk = total / 4;
+                auto worker = [&](int start, int end) {
+                    for (int i = start; i < end; i++) {
+                        uint32_t p = pixels[i];
+                        uint8_t b = p & 0xFF;
+                        uint8_t g = (p >> 8) & 0xFF;
+                        uint8_t r = (p >> 16) & 0xFF;
+                        if (r || g || b) {
+                            uint8_t a = (r > g) ? (r > b ? r : b) : (g > b ? g : b);
+                            pixels[i] = (p & 0x00FFFFFF) | ((uint32_t)a << 24);
+                        }
+                    }
+                };
+                std::thread t1(worker, 0, chunk);
+                std::thread t2(worker, chunk, 2 * chunk);
+                std::thread t3(worker, 2 * chunk, 3 * chunk);
+                std::thread t4(worker, 3 * chunk, total);
+                t1.join(); t2.join(); t3.join(); t4.join();
+            }
+        }
+
         UpdateLayeredWindow(hWnd, nullptr, nullptr, &winSize, data->memDC, &zero, 0, &blend, ULW_ALPHA);
 
         // 自适应休眠：目标 144fps ≈ 6.9ms 每帧

@@ -30,26 +30,6 @@
 #include <cstdlib>
 #include <windows.h>
 
-// ─── 控制台窗口关闭拦截 ─────────────────────────────────────────────────────
-static WNDPROC g_originalConsoleWndProc = nullptr;
-
-static LRESULT CALLBACK ConsoleWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (msg == WM_CLOSE) {
-        return 0;
-    }
-    if (msg == WM_SYSCOMMAND && (wParam & 0xFFF0) == SC_CLOSE) {
-        return 0;
-    }
-    return CallWindowProc(g_originalConsoleWndProc, hWnd, msg, wParam, lParam);
-}
-
-static BOOL WINAPI ConsoleCtrlHandler(DWORD dwCtrlType) {
-    if (dwCtrlType == CTRL_C_EVENT || dwCtrlType == CTRL_CLOSE_EVENT) {
-        return TRUE;
-    }
-    return FALSE;
-}
-
 Shell::Shell()
     : parser_(std::make_unique<Parser>())
     , executor_(std::make_unique<Executor>())
@@ -60,17 +40,6 @@ Shell::Shell()
 
     // Intercept std::cout to underline URLs / file paths
     TerminalPrinter::instance().install();
-
-    // 禁用关闭按钮、任务栏关闭、WM_CLOSE
-    HWND hConsole = GetConsoleWindow();
-    if (hConsole) {
-        HMENU hSysMenu = GetSystemMenu(hConsole, FALSE);
-        if (hSysMenu) {
-            DeleteMenu(hSysMenu, SC_CLOSE, MF_BYCOMMAND);
-        }
-        g_originalConsoleWndProc = (WNDPROC)SetWindowLongPtr(hConsole, GWLP_WNDPROC, (LONG_PTR)ConsoleWndProc);
-    }
-    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
     // 注册模块
     auto coreModule = std::make_unique<CoreModule>();
