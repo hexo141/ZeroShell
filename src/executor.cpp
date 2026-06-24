@@ -19,6 +19,22 @@ static std::wstring buildCommandLine(const std::string& program, const std::vect
     return cmdLine;
 }
 
+Executor::Executor() {
+    // 安装控制台控制处理器，拦截 Ctrl+C 信号
+    // 防止 ZeroShell 自身在子进程运行期间被 Ctrl+C 终止
+    SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
+}
+
+BOOL WINAPI Executor::consoleCtrlHandler(DWORD ctrlType) {
+    if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT) {
+        // 返回 TRUE 表示已处理，阻止系统默认行为（终止进程）
+        // 子进程仍会收到信号，因为它共享同一控制台
+        return TRUE;
+    }
+    // 其他事件（如 CTRL_CLOSE_EVENT）交给默认处理器
+    return FALSE;
+}
+
 int Executor::execute(const Pipeline& pipeline) {
     if (pipeline.empty()) return 0;
 

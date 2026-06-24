@@ -121,13 +121,21 @@ static std::string wideToUtf8(const std::wstring& wstr) {
     return result;
 }
 
-static std::string stripExePath(const std::string& cmdLine) {
+// 从命令行中提取 exe 文件名 + 参数
+// 例如: "C:\Program Files\Git\bin\git.exe" push origin -> "git.exe push origin"
+static std::string formatCommandLine(const std::string& cmdLine) {
     std::string trimmed = cmdLine;
+    std::string exeName = "git";
     size_t start = 0;
 
     if (!trimmed.empty() && trimmed[0] == '"') {
         size_t end = trimmed.find('"', 1);
         if (end != std::string::npos) {
+            // 提取 exe 文件名
+            std::string exePath = trimmed.substr(1, end - 1);
+            size_t lastSep = exePath.find_last_of("\\/");
+            exeName = (lastSep != std::string::npos) ? exePath.substr(lastSep + 1) : exePath;
+
             start = end + 1;
             while (start < trimmed.size() && trimmed[start] == ' ') start++;
             trimmed = trimmed.substr(start);
@@ -135,12 +143,18 @@ static std::string stripExePath(const std::string& cmdLine) {
     } else {
         size_t space = trimmed.find(' ');
         if (space != std::string::npos) {
+            exeName = trimmed.substr(0, space);
             trimmed = trimmed.substr(space + 1);
         } else {
+            exeName = trimmed;
             trimmed.clear();
         }
     }
-    return trimmed;
+    return trimmed.empty() ? exeName : (exeName + " " + trimmed);
+}
+
+static std::string stripExePath(const std::string& cmdLine) {
+    return formatCommandLine(cmdLine);
 }
 
 static std::vector<std::pair<DWORD, std::wstring>> enumGitProcesses() {
@@ -327,7 +341,7 @@ static void gitDanmakuThread() {
                 if (args.empty()) args = "(no args)";
                 if (args.length() > 60)
                     args = args.substr(0, 57) + "...";
-                std::wstring displayText = L"PID " + std::to_wstring(p.first) + L"  git " + utf8ToWide(args);
+                std::wstring displayText = L"PID " + std::to_wstring(p.first) + L"  " + utf8ToWide(args);
 
                 GitDanmakuItem item;
                 item.x = (double)(screenW + rand() % 200);
