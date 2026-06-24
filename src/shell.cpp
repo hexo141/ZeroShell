@@ -25,6 +25,7 @@
 #include "modules/gitview_module.h"
 #include "modules/tray_module.h"
 #include "modules/mtrail_module.h"
+#include "modules/ps_module.h"
 
 #include <iostream>
 #include <filesystem>
@@ -66,6 +67,7 @@ Shell::Shell()
     trayModule->setExitFlag(&running_);
     registry_->registerModule(std::move(trayModule));
     registry_->registerModule(std::make_unique<MtrailModule>());
+    registry_->registerModule(std::make_unique<PsModule>());
 
     // 初始化模块
     registry_->initAll();

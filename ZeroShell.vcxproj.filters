@@ -60,6 +60,9 @@
     <ClCompile Include="src\modules\driver_module.cpp">
       <Filter>模块</Filter>
     </ClCompile>
+    <ClCompile Include="src\modules\ps_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
     <ClCompile Include="src\terminal_printer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -119,6 +122,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\modules\mtrail_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps_module.h">
       <Filter>模块</Filter>
     </ClInclude>
   </ItemGroup>
