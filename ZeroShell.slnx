@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="ZeroShell.vcxproj" Id="d4cb0f73-ec95-4f11-8234-8b88a6d5e860" />
+  <Project Path="TimeHackHook\TimeHackHook.vcxproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567891" />
 </Solution>

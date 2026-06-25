@@ -184,6 +184,7 @@
     <ClCompile Include="src\modules\ps\ps_render.cpp" />
     <ClCompile Include="src\modules\ps\ps_memory.cpp" />
     <ClCompile Include="src\modules\ps\ps_tools.cpp" />
+    <ClCompile Include="src\modules\timehack_module.cpp" />
     <ClCompile Include="src\terminal_printer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -220,9 +221,15 @@
     <ClInclude Include="src\modules\ps\ps_render.h" />
     <ClInclude Include="src\modules\ps\ps_memory.h" />
     <ClInclude Include="src\modules\ps\ps_tools.h" />
+    <ClInclude Include="src\modules\timehack_module.h" />
     <ClInclude Include="include\terminal_printer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ProjectReference Include="TimeHackHook\TimeHackHook.vcxproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
 </Project>

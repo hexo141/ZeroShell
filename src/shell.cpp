@@ -26,6 +26,7 @@
 #include "modules/tray_module.h"
 #include "modules/mtrail_module.h"
 #include "modules/ps_module.h"
+#include "modules/timehack_module.h"
 
 #include <iostream>
 #include <filesystem>
@@ -68,6 +69,7 @@ Shell::Shell()
     registry_->registerModule(std::move(trayModule));
     registry_->registerModule(std::make_unique<MtrailModule>());
     registry_->registerModule(std::make_unique<PsModule>());
+    registry_->registerModule(std::make_unique<TimeHackModule>());
 
     // 初始化模块
     registry_->initAll();

@@ -212,6 +212,7 @@ int buildDetailLines(const ProcDetail& d, int width, std::vector<std::string>& o
     add("Window Title", d.windowTitle.empty() ? "(none)" : d.windowTitle);
     add("Window Visible", d.windowVisible ? "Yes" : "No");
     add("Window Topmost", d.windowTopmost ? "Yes" : "No");
+    add("Window Z-Order", d.windowTitle.empty() ? "(no window)" : zorderToString(d.zorder));
 
     return (int)out.size();
 }

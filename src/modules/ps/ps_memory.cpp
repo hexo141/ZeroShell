@@ -318,6 +318,10 @@ void drawMemSearch(HANDLE hOut, const std::string& name, DWORD pid,
                    int memSearchSel, int memSearchScroll,
                    const std::string& memSearchMsg,
                    const std::string& breadcrumb,
+                   bool memSearchEditing, int memSearchEditCol,
+                   bool memSearchEditHighNibble,
+                   const std::vector<BYTE>& memSearchEditBuf,
+                   bool memSearchValEditing, const std::string& memSearchValInput,
                    int width, int bottomY) {
     SetConsoleCursorPosition(hOut, {0, 0});
     char buf[640];
@@ -388,6 +392,52 @@ void drawMemSearch(HANDLE hOut, const std::string& name, DWORD pid,
     if (memSearchInputting && count == 0) {
         writeStr(hOut, std::string(COLOR_GRAY) + "  Press Enter to search..." + COLOR_RESET + "\x1b[K\n");
         row++;
+    } else if (memSearchEditing) {
+        // 编辑模式
+        const auto& hit = memSearchResults[sel];
+        snprintf(buf, sizeof(buf), "%s  Address: 0x%016llX  Value: %s", COLOR_WHITE, (unsigned long long)hit.addr, COLOR_RESET);
+        writeStr(hOut, buf);
+        row++;
+
+        if (memSearchValEditing) {
+            // 值编辑模式
+            const char* typeName = (memSearchType == 1) ? "Int32" : "Float";
+            snprintf(buf, sizeof(buf), "  %s: %s%s%s%s\x1b[K\n",
+                typeName, COLOR_YELLOW, memSearchValInput.c_str(), COLOR_RESET,
+                memSearchValInput.empty() ? " (enter value)" : "");
+            writeStr(hOut, buf);
+            row++;
+        } else {
+            // hex编辑模式
+            writeStr(hOut, "  ");
+            for (int b = 0; b < (int)memSearchEditBuf.size(); ++b) {
+                BYTE val = memSearchEditBuf[b];
+                if (b == memSearchEditCol) {
+                    snprintf(buf, sizeof(buf), "%s[%02X]%s ", COLOR_YELLOW, val, COLOR_RESET);
+                } else {
+                    snprintf(buf, sizeof(buf), "%02X ", val);
+                }
+                writeStr(hOut, buf);
+                if (b == 3) writeStr(hOut, " ");
+            }
+            writeStr(hOut, "\x1b[K\n");
+            row++;
+        }
+
+        // 显示当前值的解析
+        if (memSearchType == 1 && memSearchEditBuf.size() >= 4) {
+            int32_t val;
+            memcpy(&val, memSearchEditBuf.data(), 4);
+            snprintf(buf, sizeof(buf), "%s  Int32: %d%s\x1b[K\n", COLOR_GRAY, val, COLOR_RESET);
+            writeStr(hOut, buf);
+            row++;
+        } else if (memSearchType == 2 && memSearchEditBuf.size() >= 4) {
+            float val;
+            memcpy(&val, memSearchEditBuf.data(), 4);
+            snprintf(buf, sizeof(buf), "%s  Float: %g%s\x1b[K\n", COLOR_GRAY, val, COLOR_RESET);
+            writeStr(hOut, buf);
+            row++;
+        }
     } else if (count == 0) {
         writeStr(hOut, std::string(COLOR_GRAY) + "  No matches found" + COLOR_RESET + "\x1b[K\n");
         row++;
@@ -425,9 +475,13 @@ void drawMemSearch(HANDLE hOut, const std::string& name, DWORD pid,
 
     SetConsoleCursorPosition(hOut, {0, (SHORT)bottomY});
     if (memSearchInputting) {
-        snprintf(buf, sizeof(buf), "%s%s  1-4 Type  Enter Search  Esc Back  q Exit%s", BG_DARK, COLOR_WHITE, COLOR_RESET);
+        snprintf(buf, sizeof(buf), "%s%s  \xe2\x86\x90\xe2\x86\x92 Type  Enter Search  Esc Back  q Exit%s", BG_DARK, COLOR_WHITE, COLOR_RESET);
+    } else if (memSearchValEditing) {
+        snprintf(buf, sizeof(buf), "%s%s  Enter Write  Esc Cancel  h Hex Mode%s", BG_DARK, COLOR_WHITE, COLOR_RESET);
+    } else if (memSearchEditing) {
+        snprintf(buf, sizeof(buf), "%s%s  \xe2\x86\x90\xe2\x86\x92 Move  Enter Write  v Value  Esc Cancel  q Exit%s", BG_DARK, COLOR_WHITE, COLOR_RESET);
     } else {
-        snprintf(buf, sizeof(buf), "%s%s  %d hits  \xe2\x86\x91\xe2\x86\x93 Select  Enter View  f Filter  r Re-search  Esc Back  q Exit%s",
+        snprintf(buf, sizeof(buf), "%s%s  %d hits  \xe2\x86\x91\xe2\x86\x93 Select  Enter View  e Edit  f Filter  r Re-search  Esc Back  q Exit%s",
             BG_DARK, COLOR_WHITE, count, COLOR_RESET);
     }
     writeStr(hOut, buf);

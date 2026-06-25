@@ -71,6 +71,8 @@ static void setMica(HWND hwnd, bool enable) {
 void ZsSettingModule::setBackgroundEffect(BgEffect effect) {
     HWND hwnd = GetConsoleWindow();
     if (!hwnd) return;
+    hwnd = GetAncestor(hwnd, GA_ROOT);
+    if (!hwnd) return;
 
     // Reset transparency when applying an effect
     if (effect != BG_EFFECT_NONE) {
@@ -108,6 +110,8 @@ void ZsSettingModule::setBackgroundEffect(BgEffect effect) {
 
 void ZsSettingModule::setTransparency(int percent) {
     HWND hwnd = GetConsoleWindow();
+    if (!hwnd) return;
+    hwnd = GetAncestor(hwnd, GA_ROOT);
     if (!hwnd) return;
 
     if (percent <= 0) {

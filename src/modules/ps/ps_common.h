@@ -21,6 +21,32 @@ inline const char* COLOR_DIM      = "\x1b[38;2;80;80;80m";
 inline const char* BG_BLUE        = "\x1b[48;2;0;120;215m";
 inline const char* BG_DARK        = "\x1b[48;2;30;30;40m";
 
+// ─── Z-order 等级枚举 ─────────────────────────────────────────────────────────
+
+enum ZBID : DWORD {
+    ZBID_DEFAULT                   = 0,
+    ZBID_DESKTOP                   = 1,
+    ZBID_UIACCESS                  = 2,
+    ZBID_IMMERSIVE_IHM             = 3,
+    ZBID_IMMERSIVE_NOTIFICATION    = 4,
+    ZBID_IMMERSIVE_APPCHROME       = 5,
+    ZBID_IMMERSIVE_MOGO            = 6,
+    ZBID_IMMERSIVE_EDGY            = 7,
+    ZBID_IMMERSIVE_INACTIVEMOBODY  = 8,
+    ZBID_IMMERSIVE_INACTIVEDOCK    = 9,
+    ZBID_IMMERSIVE_ACTIVEMOBODY    = 10,
+    ZBID_IMMERSIVE_ACTIVEDOCK      = 11,
+    ZBID_IMMERSIVE_BACKGROUND      = 12,
+    ZBID_IMMERSIVE_SEARCH          = 13,
+    ZBID_GENUINE_WINDOWS           = 14,
+    ZBID_IMMERSIVE_RESTRICTED      = 15,
+    ZBID_SYSTEM_TOOLS              = 16,
+    ZBID_LOCK                      = 17,
+    ZBID_ABOVELOCK_UX              = 18,
+};
+
+std::string zorderToString(DWORD zorder);
+
 // ─── 进程信息结构 ────────────────────────────────────────────────────────────
 
 struct ProcInfo {
@@ -61,6 +87,7 @@ struct ProcDetail {
     std::string windowTitle;
     bool windowVisible = false;
     bool windowTopmost = false;
+    DWORD zorder = ZBID_DEFAULT;
 };
 
 // ─── 系统信息快照 ────────────────────────────────────────────────────────────

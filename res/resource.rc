@@ -1,3 +1,5 @@
 #include "resource.h"
 
-IDR_RTCORE64_SYS  RCDATA  "RTCore64.sys"
+IDR_RTCORE64_SYS       RCDATA  "RTCore64.sys"
+IDR_TIMEHACKHOOK32_DLL RCDATA  "TimeHackHook32.dll"
+IDR_TIMEHACKHOOK64_DLL RCDATA  "TimeHackHook64.dll"

@@ -51,6 +51,33 @@ std::string formatFileTime(const FILETIME& ft) {
     return buf;
 }
 
+// ─── Z-order 等级转字符串 ────────────────────────────────────────────────────
+
+std::string zorderToString(DWORD zorder) {
+    switch (zorder) {
+        case ZBID_DEFAULT:                  return "Default (0)";
+        case ZBID_DESKTOP:                  return "Desktop (1)";
+        case ZBID_UIACCESS:                 return "UI Access (2)";
+        case ZBID_IMMERSIVE_IHM:            return "Immersive IHM (3)";
+        case ZBID_IMMERSIVE_NOTIFICATION:   return "Immersive Notification (4)";
+        case ZBID_IMMERSIVE_APPCHROME:      return "Immersive AppChrome (5)";
+        case ZBID_IMMERSIVE_MOGO:           return "Immersive MoGo (6)";
+        case ZBID_IMMERSIVE_EDGY:           return "Immersive Edgy (7)";
+        case ZBID_IMMERSIVE_INACTIVEMOBODY: return "Immersive Inactive MoBody (8)";
+        case ZBID_IMMERSIVE_INACTIVEDOCK:   return "Immersive Inactive Dock (9)";
+        case ZBID_IMMERSIVE_ACTIVEMOBODY:   return "Immersive Active MoBody (10)";
+        case ZBID_IMMERSIVE_ACTIVEDOCK:     return "Immersive Active Dock (11)";
+        case ZBID_IMMERSIVE_BACKGROUND:     return "Immersive Background (12)";
+        case ZBID_IMMERSIVE_SEARCH:         return "Immersive Search (13)";
+        case ZBID_GENUINE_WINDOWS:          return "Genuine Windows (14)";
+        case ZBID_IMMERSIVE_RESTRICTED:     return "Immersive Restricted (15)";
+        case ZBID_SYSTEM_TOOLS:             return "System Tools (16)";
+        case ZBID_LOCK:                     return "Lock Screen (17)";
+        case ZBID_ABOVELOCK_UX:             return "Above Lock UX (18)";
+        default:                            return "Unknown (" + std::to_string(zorder) + ")";
+    }
+}
+
 // ─── 进程详情采集 ────────────────────────────────────────────────────────────
 
 static std::string getFileVersionInfo(const std::wstring& path, const wchar_t* subKey) {
@@ -77,6 +104,7 @@ struct WindowSearchParam {
     std::string* title;
     bool* visible;
     bool* topmost;
+    DWORD* zorder;
 };
 
 static BOOL CALLBACK enumWindowProc(HWND hWnd, LPARAM lp) {
@@ -89,6 +117,16 @@ static BOOL CALLBACK enumWindowProc(HWND hWnd, LPARAM lp) {
         *param->title = wideToUtf8(buf);
         *param->visible = IsWindowVisible(hWnd) ? true : false;
         *param->topmost = (GetWindowLongW(hWnd, GWL_EXSTYLE) & WS_EX_TOPMOST) ? true : false;
+
+        // 获取 Z-order 等级 (GetWindowBand 仅在 Win8+ 可用)
+        auto pGetWindowBand = (BOOL(WINAPI*)(HWND, PDWORD))
+            GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetWindowBand");
+        if (pGetWindowBand) {
+            DWORD band = 0;
+            if (pGetWindowBand(hWnd, &band)) {
+                *param->zorder = band;
+            }
+        }
         return FALSE;
     }
     return TRUE;
@@ -298,6 +336,7 @@ ProcDetail collectProcDetail(DWORD pid, const ProcInfo* baseInfo) {
     wparam.title = &d.windowTitle;
     wparam.visible = &d.windowVisible;
     wparam.topmost = &d.windowTopmost;
+    wparam.zorder = &d.zorder;
     EnumWindows(enumWindowProc, (LPARAM)&wparam);
 
     return d;

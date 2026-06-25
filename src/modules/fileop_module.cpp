@@ -220,9 +220,28 @@ std::vector<FileOpModule::FileEntry> FileOpModule::collectFiles(
                 }
 
                 if (type == OpType::Delete) {
-                    // 删除目录：直接收集目录本身
-                    entries.push_back({src, {}, true, 0});
-                    stats.totalDirs++;
+                    // 删除目录：直接收集目录本身，并统计内部文件数量
+                    FileEntry dirEntry;
+                    dirEntry.source = src;
+                    dirEntry.isDirectory = true;
+                    dirEntry.size = 0;
+                    uint64_t fileCount = 0;
+                    uint64_t byteCount = 0;
+                    uint64_t dirCount = 0;
+                    for (const auto& entry : std::filesystem::recursive_directory_iterator(src, ec)) {
+                        if (entry.is_regular_file(ec)) {
+                            fileCount++;
+                            byteCount += entry.file_size(ec);
+                        } else if (entry.is_directory(ec)) {
+                            dirCount++;
+                        }
+                    }
+                    dirEntry.containedFiles = fileCount;
+                    dirEntry.containedBytes = byteCount;
+                    stats.totalFiles += fileCount;
+                    stats.totalBytes += byteCount;
+                    stats.totalDirs += dirCount + 1;
+                    entries.push_back(dirEntry);
                 } else {
                     // move/copy 目录：需要创建目标目录并收集子文件
                     std::filesystem::path destDir;
@@ -474,10 +493,21 @@ void FileOpModule::runWorkers(const OpParams& params, OpType type,
                 if (type == OpType::Delete) {
                     if (!params.dryRun) {
                         bool ok = deleteDirectory(entry.source, params.force);
-                        if (ok) stats.succeededDirs++;
-                        else stats.failedDirs++;
+                        if (ok) {
+                            stats.succeededDirs++;
+                            stats.processedFiles += entry.containedFiles;
+                            stats.succeededFiles += entry.containedFiles;
+                            stats.processedBytes += entry.containedBytes;
+                        } else {
+                            stats.failedDirs++;
+                            stats.processedFiles += entry.containedFiles;
+                            stats.failedFiles += entry.containedFiles;
+                        }
                     } else {
                         stats.succeededDirs++;
+                        stats.processedFiles += entry.containedFiles;
+                        stats.succeededFiles += entry.containedFiles;
+                        stats.processedBytes += entry.containedBytes;
                     }
                 } else if (type == OpType::Move || type == OpType::Copy) {
                     if (!params.dryRun && !entry.dest.empty()) {
@@ -492,9 +522,13 @@ void FileOpModule::runWorkers(const OpParams& params, OpType type,
 
                 if (params.verbose && !params.quiet) {
                     std::string msg;
-                    if (type == OpType::Delete)
-                        msg = "  [DEL DIR] " + entry.source.string() + "\n";
-                    else if (type == OpType::Move)
+                    if (type == OpType::Delete) {
+                        msg = "  [DEL DIR] " + entry.source.string();
+                        if (entry.containedFiles > 0) {
+                            msg += " (" + std::to_string(entry.containedFiles) + " files, " + formatSize(entry.containedBytes) + ")";
+                        }
+                        msg += "\n";
+                    } else if (type == OpType::Move)
                         msg = "  [MOVE DIR] " + entry.source.string() + " -> " + entry.dest.string() + "\n";
                     else
                         msg = "  [COPY DIR] " + entry.source.string() + " -> " + entry.dest.string() + "\n";

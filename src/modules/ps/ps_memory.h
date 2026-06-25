@@ -50,4 +50,8 @@ void drawMemSearch(HANDLE hOut, const std::string& name, DWORD pid,
                    int memSearchSel, int memSearchScroll,
                    const std::string& memSearchMsg,
                    const std::string& breadcrumb,
+                   bool memSearchEditing, int memSearchEditCol,
+                   bool memSearchEditHighNibble,
+                   const std::vector<BYTE>& memSearchEditBuf,
+                   bool memSearchValEditing, const std::string& memSearchValInput,
                    int width, int bottomY);

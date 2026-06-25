@@ -112,6 +112,16 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
     bool memSearchFiltering = false; // true=正在输入筛选条件
     std::string memSearchLastQuery;  // 筛选时保存上一级查询（用于面包屑显示）
 
+    // 内存搜索编辑状态
+    bool memSearchEditing = false;
+    int memSearchEditCol = 0;
+    bool memSearchEditHighNibble = true;
+    std::vector<BYTE> memSearchEditBuf;
+
+    // 值编辑模式
+    bool memSearchValEditing = false;
+    std::string memSearchValInput;
+
     ULONGLONG lastRefresh = 0;
     const ULONGLONG refreshInterval = 1500; // ms
 
@@ -170,11 +180,15 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                 } else if (memSearchFiltering && !memSearchLastQuery.empty()) {
                     breadcrumb += " > " + memSearchLastQuery;
                 }
-                drawMemSearch(hOut, currentDetail.name, currentDetail.pid,
-                              memSearchType, memSearchInput, memSearchInputting,
-                              memSearchResults, memSearchRegions,
-                              memSearchSel, memSearchScroll, memSearchMsg,
-                              breadcrumb, width, bottomRow);
+                                drawMemSearch(hOut, currentDetail.name, currentDetail.pid,
+                                              memSearchType, memSearchInput, memSearchInputting,
+                                              memSearchResults, memSearchRegions,
+                                              memSearchSel, memSearchScroll, memSearchMsg,
+                                              breadcrumb,
+                                              memSearchEditing, memSearchEditCol,
+                                              memSearchEditHighNibble, memSearchEditBuf,
+                                              memSearchValEditing, memSearchValInput,
+                                              width, bottomRow);
             } else if (showingDllList) {
                 drawDllListView(hOut, dllNames, dllBases, currentDetail.pid, dllSel, dllScroll, width, bottomRow);
             } else if (showingTool) {
@@ -464,7 +478,11 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                                               memSearchType, memSearchInput, memSearchInputting,
                                               memSearchResults, memSearchRegions,
                                               memSearchSel, memSearchScroll, memSearchMsg,
-                                              breadcrumb, width, bottomRow);
+                                              breadcrumb,
+                                              memSearchEditing, memSearchEditCol,
+                                              memSearchEditHighNibble, memSearchEditBuf,
+                                              memSearchValEditing, memSearchValInput,
+                                              width, bottomRow);
                                 // 保存当前状态到历史栈
                                 memSearchHistory.push_back({
                                     memSearchLastQuery, memSearchType,
@@ -496,7 +514,11 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                                               memSearchType, memSearchInput, memSearchInputting,
                                               memSearchResults, memSearchRegions,
                                               memSearchSel, memSearchScroll, memSearchMsg,
-                                              breadcrumb, width, bottomRow);
+                                              breadcrumb,
+                                              memSearchEditing, memSearchEditCol,
+                                              memSearchEditHighNibble, memSearchEditBuf,
+                                              memSearchValEditing, memSearchValInput,
+                                              width, bottomRow);
                                 memSearchRegions = enumReadableRegions(memProcHandle);
                                 memSearchResults = searchMemory(memProcHandle, memSearchRegions,
                                                                 pattern.data(), pattern.size(), mask.c_str());
@@ -523,8 +545,12 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                         memSearchMsg.clear();
                         needRefresh = true;
                     }
-                } else if (wch >= '1' && wch <= '5') {
-                    memSearchType = wch - '1';
+                } else if (vk == VK_LEFT && memSearchInput.empty()) {
+                    memSearchType = (memSearchType - 1 + 5) % 5;
+                    memSearchMsg.clear();
+                    needRefresh = true;
+                } else if (vk == VK_RIGHT && memSearchInput.empty()) {
+                    memSearchType = (memSearchType + 1) % 5;
                     memSearchMsg.clear();
                     needRefresh = true;
                 } else if (wch >= 32) {
@@ -533,6 +559,117 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                     memSearchInput += wideToUtf8(wc);
                     memSearchMsg.clear();
                     needRefresh = true;
+                }
+            } else if (memSearchEditing) {
+                // 编辑模式
+                auto hexVal = [](char c) -> int {
+                    if (c >= '0' && c <= '9') return c - '0';
+                    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+                    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+                    return -1;
+                };
+                if (vk == VK_ESCAPE) {
+                    memSearchEditing = false;
+                    memSearchValEditing = false;
+                    memSearchValInput.clear();
+                    memSearchMsg.clear();
+                    needRefresh = true;
+                } else if (vk == VK_RETURN) {
+                    if (memSearchValEditing) {
+                        // 值编辑模式：解析并写入
+                        bool ok = false;
+                        std::vector<BYTE> newVal;
+                        if (memSearchType == 1) {
+                            try {
+                                int32_t v = (int32_t)std::stol(memSearchValInput);
+                                newVal.resize(4);
+                                memcpy(newVal.data(), &v, 4);
+                                ok = true;
+                            } catch (...) {}
+                        } else if (memSearchType == 2) {
+                            try {
+                                float v = std::stof(memSearchValInput);
+                                newVal.resize(4);
+                                memcpy(newVal.data(), &v, 4);
+                                ok = true;
+                            } catch (...) {}
+                        }
+                        if (ok && memProcHandle && writeMemAt(memProcHandle, memSearchResults[memSearchSel].addr, newVal.data(), newVal.size())) {
+                            memSearchMsg = "Written";
+                            memSearchEditBuf = newVal;
+                        } else {
+                            memSearchMsg = ok ? "Write failed" : "Invalid value";
+                        }
+                        memSearchValEditing = false;
+                        memSearchValInput.clear();
+                        needRefresh = true;
+                    } else {
+                        // hex编辑模式：写回内存
+                        if (memProcHandle && writeMemAt(memProcHandle, memSearchResults[memSearchSel].addr, memSearchEditBuf.data(), memSearchEditBuf.size())) {
+                            memSearchMsg = "Written";
+                        } else {
+                            memSearchMsg = "Write failed";
+                        }
+                        memSearchEditing = false;
+                        needRefresh = true;
+                    }
+                } else if (vk == VK_LEFT) {
+                    if (!memSearchValEditing) {
+                        memSearchEditCol = (memSearchEditCol - 1 + (int)memSearchEditBuf.size()) % (int)memSearchEditBuf.size();
+                        memSearchEditHighNibble = true;
+                        needRefresh = true;
+                    }
+                } else if (vk == VK_RIGHT) {
+                    if (!memSearchValEditing) {
+                        memSearchEditCol = (memSearchEditCol + 1) % (int)memSearchEditBuf.size();
+                        memSearchEditHighNibble = true;
+                        needRefresh = true;
+                    }
+                } else if (wch == L'v' || wch == L'V') {
+                    // 切换到值编辑模式
+                    if (memSearchType == 1 || memSearchType == 2) {
+                        memSearchValEditing = true;
+                        memSearchValInput.clear();
+                        memSearchMsg.clear();
+                        needRefresh = true;
+                    }
+                } else if (wch == L'h' || wch == L'H') {
+                    // 切换回hex编辑模式
+                    if (memSearchValEditing) {
+                        memSearchValEditing = false;
+                        memSearchValInput.clear();
+                        memSearchMsg.clear();
+                        needRefresh = true;
+                    }
+                } else if (memSearchValEditing) {
+                    // 值编辑模式输入
+                    if (vk == VK_BACK) {
+                        if (!memSearchValInput.empty()) {
+                            memSearchValInput.pop_back();
+                            memSearchMsg.clear();
+                            needRefresh = true;
+                        }
+                    } else if (wch >= 32 && wch < 127) {
+                        char c = (char)wch;
+                        if ((c >= '0' && c <= '9') || c == '-' || c == '.' ||
+                            (memSearchValInput.empty() && (c == '-' || c == '+'))) {
+                            memSearchValInput += c;
+                            memSearchMsg.clear();
+                            needRefresh = true;
+                        }
+                    }
+                } else if (wch >= 32 && wch < 127) {
+                    int v = hexVal((char)wch);
+                    if (v >= 0) {
+                        if (memSearchEditHighNibble) {
+                            memSearchEditBuf[memSearchEditCol] = (memSearchEditBuf[memSearchEditCol] & 0x0F) | (BYTE)(v << 4);
+                        } else {
+                            memSearchEditBuf[memSearchEditCol] = (memSearchEditBuf[memSearchEditCol] & 0xF0) | (BYTE)v;
+                            memSearchEditCol = (memSearchEditCol + 1) % (int)memSearchEditBuf.size();
+                        }
+                        memSearchEditHighNibble = !memSearchEditHighNibble;
+                        needRefresh = true;
+                    }
                 }
             } else {
                 // 结果列表阶段
@@ -594,6 +731,21 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                         memSearchMsg.clear();
                         needRefresh = true;
                     }
+                } else if (wch == L'e' || wch == L'E') {
+                    // 进入编辑模式
+                    if (count > 0 && memSearchSel < count) {
+                        int editSize = 4;
+                        memSearchEditBuf.resize(editSize);
+                        if (memProcHandle && readMemAt(memProcHandle, memSearchResults[memSearchSel].addr, memSearchEditBuf.data(), editSize)) {
+                            memSearchEditing = true;
+                            memSearchEditCol = 0;
+                            memSearchEditHighNibble = true;
+                            memSearchMsg.clear();
+                        } else {
+                            memSearchMsg = "Read failed";
+                        }
+                        needRefresh = true;
+                    }
                 } else if (wch == L'r' || wch == L'R') {
                     // 重新搜索（清除历史）
                     memSearchInputting = true;
@@ -605,6 +757,12 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                     memSearchSel = 0;
                     memSearchScroll = 0;
                     memSearchMsg.clear();
+                    memSearchEditing = false;
+                    memSearchEditCol = 0;
+                    memSearchEditHighNibble = true;
+                    memSearchEditBuf.clear();
+                    memSearchValEditing = false;
+                    memSearchValInput.clear();
                     needRefresh = true;
                 }
             }
@@ -672,6 +830,12 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                         memSearchHistory.clear();
                         memSearchFiltering = false;
                         memSearchLastQuery.clear();
+                        memSearchEditing = false;
+                        memSearchEditCol = 0;
+                        memSearchEditHighNibble = true;
+                        memSearchEditBuf.clear();
+                        memSearchValEditing = false;
+                        memSearchValInput.clear();
                     }
                     needRefresh = true;
                 }

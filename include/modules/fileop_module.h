@@ -58,6 +58,8 @@ private:
         std::filesystem::path dest;
         bool isDirectory = false;
         uint64_t size = 0;
+        uint64_t containedFiles = 0;
+        uint64_t containedBytes = 0;
     };
     std::vector<FileEntry> collectFiles(const OpParams& params, OpType type, OpStats& stats);
 
