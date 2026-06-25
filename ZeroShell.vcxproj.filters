@@ -16,6 +16,9 @@
     <Filter Include="模块">
       <UniqueIdentifier>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</UniqueIdentifier>
     </Filter>
+    <Filter Include="模块\ps">
+      <UniqueIdentifier>{B2C3D4E5-F6A7-8901-BCDE-F12345678901}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -62,6 +65,21 @@
     </ClCompile>
     <ClCompile Include="src\modules\ps_module.cpp">
       <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ps\ps_common.cpp">
+      <Filter>模块\ps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ps\ps_collectors.cpp">
+      <Filter>模块\ps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ps\ps_render.cpp">
+      <Filter>模块\ps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ps\ps_memory.cpp">
+      <Filter>模块\ps</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ps\ps_tools.cpp">
+      <Filter>模块\ps</Filter>
     </ClCompile>
     <ClCompile Include="src\terminal_printer.cpp">
       <Filter>源文件</Filter>
@@ -126,6 +144,21 @@
     </ClInclude>
     <ClInclude Include="src\modules\ps_module.h">
       <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps\ps_common.h">
+      <Filter>模块\ps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps\ps_collectors.h">
+      <Filter>模块\ps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps\ps_render.h">
+      <Filter>模块\ps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps\ps_memory.h">
+      <Filter>模块\ps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ps\ps_tools.h">
+      <Filter>模块\ps</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
