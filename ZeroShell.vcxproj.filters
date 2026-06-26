@@ -87,6 +87,44 @@
     <ClCompile Include="src\terminal_printer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="src\modules\ti_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\privilege_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\zs_setting_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\typing_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\anti_capture_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\liquid_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\fastfind_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\fileop_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\ciallo_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\gitview_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\tray_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\mtrail_module.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="res\resource.rc">
@@ -145,9 +183,6 @@
     <ClInclude Include="include\terminal_printer.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="src\modules\mtrail_module.h">
-      <Filter>模块</Filter>
-    </ClInclude>
     <ClInclude Include="src\modules\ps_module.h">
       <Filter>模块</Filter>
     </ClInclude>
@@ -165,6 +200,33 @@
     </ClInclude>
     <ClInclude Include="src\modules\ps\ps_tools.h">
       <Filter>模块\ps</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\privilege_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\zs_setting_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\typing_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\anti_capture_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\liquid_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\fastfind_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\ciallo_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\tray_module.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="include\modules\fileop_module.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
