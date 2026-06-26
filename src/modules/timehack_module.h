@@ -17,7 +17,7 @@ public:
 
 private:
     // 窗口选择器（类似 AntiCapture）
-    void showWindowPicker();
+    void showWindowPicker(DWORD preselectPid = 0);
 
     // 倍率选择器
     void showScalePicker(DWORD pid, const std::string& title, const std::string& procName, bool alreadyHooked);

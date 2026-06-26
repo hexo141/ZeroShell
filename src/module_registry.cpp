@@ -5,6 +5,9 @@
 #include <cstdlib>
 #include <sstream>
 
+// Module 静态成员定义
+std::string Module::pendingCommand;
+
 // --- 生命周期 ---
 
 void ModuleRegistry::initAll() {

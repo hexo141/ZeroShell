@@ -266,9 +266,10 @@ void drawToolView(HANDLE hOut, const std::string& name, DWORD pid, int& sel, int
         "DLL Injection",
         "Unload DLL",
         "Memory Viewer",
-        "Memory Search"
+        "Memory Search",
+        "TimeHack"
     };
-    int toolCount = 5;
+    int toolCount = 6;
     if (sel >= toolCount) sel = toolCount - 1;
     if (sel < 0) sel = 0;
     char buf[256];

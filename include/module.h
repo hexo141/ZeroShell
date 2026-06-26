@@ -30,4 +30,7 @@ public:
     // 数据持久化：保存/加载模块数据到指定目录
     virtual void saveData(const std::filesystem::path& dir) {}
     virtual void loadData(const std::filesystem::path& dir) {}
+
+    // 跨模块跳转：模块退出后由 Shell 执行的待定命令
+    static std::string pendingCommand;
 };

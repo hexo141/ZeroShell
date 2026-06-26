@@ -1,4 +1,5 @@
 #include "timehack_module.h"
+#include "resource.h"
 #include <iostream>
 #include <algorithm>
 #include <tlhelp32.h>
@@ -94,15 +95,23 @@ std::vector<std::string> TimeHackModule::getCommands() const {
 bool TimeHackModule::execute(const std::string& cmd, const std::vector<std::string>& args) {
     if (cmd != "timehack") return false;
 
+    // 解析可选 PID 参数（用于从 ps 模块跳转时预选进程）
+    DWORD preselectPid = 0;
+    if (!args.empty()) {
+        try {
+            preselectPid = (DWORD)std::stoul(args[0]);
+        } catch (...) {}
+    }
+
     // 直接打开窗口选择器
-    showWindowPicker();
+    showWindowPicker(preselectPid);
     return true;
 }
 
 // ============================================================================
 // 窗口选择器（类似 AntiCapture）
 // ============================================================================
-void TimeHackModule::showWindowPicker() {
+void TimeHackModule::showWindowPicker(DWORD preselectPid) {
     HANDLE hIn = GetStdHandle(STD_INPUT_HANDLE);
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     DWORD oldInMode, oldOutMode;
@@ -131,6 +140,17 @@ void TimeHackModule::showWindowPicker() {
         }
     }
 
+    // 预选指定 PID 的窗口
+    int selected = 0;
+    if (preselectPid != 0) {
+        for (int i = 0; i < (int)windows.size(); ++i) {
+            if (windows[i].pid == preselectPid) {
+                selected = i;
+                break;
+            }
+        }
+    }
+
     CONSOLE_SCREEN_BUFFER_INFO csbi;
     GetConsoleScreenBufferInfo(hOut, &csbi);
     SHORT startY = csbi.dwCursorPosition.Y;
@@ -139,7 +159,6 @@ void TimeHackModule::showWindowPicker() {
     if (maxVisible < 5) maxVisible = 5;
     if (maxVisible > 15) maxVisible = 15;
 
-    int selected = 0;
     int scrollOff = 0;
     DWORD written;
 
@@ -195,6 +214,11 @@ void TimeHackModule::showWindowPicker() {
             WriteConsoleA(hOut, clr.c_str(), static_cast<DWORD>(clr.size()), &written, nullptr);
         }
     };
+
+    // 确保预选项在可视范围内
+    if (selected >= maxVisible) {
+        scrollOff = selected - maxVisible + 1;
+    }
 
     drawMenu();
 
@@ -448,6 +472,34 @@ bool TimeHackModule::isProcess64Bit(HANDLE hProcess) {
 // DLL 路径
 // ============================================================================
 std::string TimeHackModule::getMinHookDllPath(bool isTarget64) {
+    // 从内嵌资源提取 DLL 到临时文件
+    int resId = isTarget64 ? IDR_MINHOOK64_DLL : IDR_MINHOOK32_DLL;
+    HRSRC hRes = FindResourceW(nullptr, MAKEINTRESOURCEW(resId), RT_RCDATA);
+    if (hRes) {
+        HGLOBAL hMem = LoadResource(nullptr, hRes);
+        if (hMem) {
+            DWORD size = SizeofResource(nullptr, hRes);
+            void* data = LockResource(hMem);
+            if (data && size) {
+                WCHAR tempPath[MAX_PATH];
+                GetTempPathW(MAX_PATH, tempPath);
+                std::wstring tempFile = std::wstring(tempPath) +
+                    (isTarget64 ? L"MinHook.x64.dll" : L"MinHook.x86.dll");
+                HANDLE hFile = CreateFileW(tempFile.c_str(), GENERIC_WRITE, 0,
+                    nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+                if (hFile != INVALID_HANDLE_VALUE) {
+                    DWORD written;
+                    WriteFile(hFile, data, size, &written, nullptr);
+                    CloseHandle(hFile);
+                    char buf[MAX_PATH];
+                    WideCharToMultiByte(CP_UTF8, 0, tempFile.c_str(), -1, buf, MAX_PATH, nullptr, nullptr);
+                    return std::string(buf);
+                }
+            }
+        }
+    }
+
+    // 回退：尝试 exe 目录下的文件
     WCHAR exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     std::wstring dir(exePath);
@@ -459,11 +511,39 @@ std::string TimeHackModule::getMinHookDllPath(bool isTarget64) {
 }
 
 std::string TimeHackModule::getHookDllPath(bool isTarget64) {
+    // 从内嵌资源提取 DLL 到临时文件
+    int resId = isTarget64 ? IDR_TIMEHACKHOOK64_DLL : IDR_TIMEHACKHOOK32_DLL;
+    HRSRC hRes = FindResourceW(nullptr, MAKEINTRESOURCEW(resId), RT_RCDATA);
+    if (hRes) {
+        HGLOBAL hMem = LoadResource(nullptr, hRes);
+        if (hMem) {
+            DWORD size = SizeofResource(nullptr, hRes);
+            void* data = LockResource(hMem);
+            if (data && size) {
+                WCHAR tempPath[MAX_PATH];
+                GetTempPathW(MAX_PATH, tempPath);
+                std::wstring tempFile = std::wstring(tempPath) +
+                    (isTarget64 ? L"TimeHackHook64.dll" : L"TimeHackHook32.dll");
+                HANDLE hFile = CreateFileW(tempFile.c_str(), GENERIC_WRITE, 0,
+                    nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+                if (hFile != INVALID_HANDLE_VALUE) {
+                    DWORD written;
+                    WriteFile(hFile, data, size, &written, nullptr);
+                    CloseHandle(hFile);
+                    char buf[MAX_PATH];
+                    WideCharToMultiByte(CP_UTF8, 0, tempFile.c_str(), -1, buf, MAX_PATH, nullptr, nullptr);
+                    return std::string(buf);
+                }
+            }
+        }
+    }
+
+    // 回退：尝试 exe 目录下的文件
     WCHAR exePath[MAX_PATH];
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     std::wstring dir(exePath);
     dir = dir.substr(0, dir.find_last_of(L'\\') + 1);
-    dir += isTarget64 ? L"TimeHackHook.dll" : L"TimeHackHook_x86.dll";
+    dir += isTarget64 ? L"TimeHackHook64.dll" : L"TimeHackHook32.dll";
     char buf[MAX_PATH];
     WideCharToMultiByte(CP_UTF8, 0, dir.c_str(), -1, buf, MAX_PATH, nullptr, nullptr);
     return std::string(buf);

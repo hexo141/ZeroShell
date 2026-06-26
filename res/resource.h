@@ -4,5 +4,7 @@
 #define IDR_RTCORE64_SYS       101
 #define IDR_TIMEHACKHOOK32_DLL 102
 #define IDR_TIMEHACKHOOK64_DLL 103
+#define IDR_MINHOOK32_DLL      104
+#define IDR_MINHOOK64_DLL      105
 
 #endif

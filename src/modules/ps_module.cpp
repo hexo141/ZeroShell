@@ -838,6 +838,10 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                         memSearchValInput.clear();
                     }
                     needRefresh = true;
+                } else if (toolSel == 5) {
+                    // TimeHack: 跳转到 timehack 模块并预选当前进程
+                    Module::pendingCommand = "timehack " + std::to_string(currentDetail.pid);
+                    running = false;
                 }
             } else if (vk == VK_ESCAPE) {
                 showingTool = false;

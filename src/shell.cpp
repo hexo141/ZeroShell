@@ -186,6 +186,15 @@ void Shell::executeLine(const std::string& line) {
 
     // 先尝试模块命令
     if (pipeline.size() == 1 && registry_->executeCommand(pipeline[0].program, pipeline[0].args)) {
+        // 处理跨模块跳转（如 ps -> timehack）
+        while (!Module::pendingCommand.empty()) {
+            std::string pending = std::move(Module::pendingCommand);
+            Module::pendingCommand.clear();
+            Pipeline p2 = parser_->parse(pending);
+            if (p2.size() == 1) {
+                registry_->executeCommand(p2[0].program, p2[0].args);
+            }
+        }
         return;
     }
 
