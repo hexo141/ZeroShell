@@ -1,0 +1,401 @@
+#version 460
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// ----------------------------------------------------------------------------
+// Bindings
+// ----------------------------------------------------------------------------
+layout(set = 0, binding = 0, rgba32f) uniform image2D uAccumImg;
+
+layout(set = 0, binding = 1, std140) uniform CameraUBO {
+    vec3  eye;
+    float _pad0;
+    vec3  target;
+    float _pad1;
+    vec3  up;
+    float fov;
+    uint  frameCount;
+    uint  width;
+    uint  height;
+    uint  samplePerFrame;
+} cam;
+
+struct SphereGpu {
+    vec4  center_radius;   // xyz=center, w=radius
+    vec4  albedo_ior;      // xyz=albedo, w=ior (<=0 non-glass)
+    int   material;
+    int   _pad[3];
+};
+
+struct WallGpu {
+    vec4  plane;           // xyz=normal, w=dist
+    vec4  albedo;          // xyz=albedo, w=unused
+    int   material;
+    int   _pad[3];
+};
+
+struct LightGpu {
+    vec4  corner;          // xyz=corner, w=unused
+    vec4  uvec;            // xyz=edge u
+    vec4  vvec;            // xyz=edge v
+    vec4  emission;        // xyz=color, w=intensity
+    int   material;
+    int   _pad[3];
+};
+
+layout(set = 0, binding = 2, std430) readonly buffer SphereBuf { SphereGpu s[]; } spheres;
+layout(set = 0, binding = 3, std430) readonly buffer WallBuf   { WallGpu   w[]; } walls;
+layout(set = 0, binding = 4, std430) readonly buffer LightBuf  { LightGpu  l[]; } lights;
+
+const int MAT_DIFFUSE  = 0;
+const int MAT_GLASS    = 1;
+const int MAT_EMISSIVE = 2;
+const int MAT_METAL    = 3;
+
+const float EPS = 1e-4;
+const float PI  = 3.14159265358979;
+const float INV_PI = 0.31830988618379;
+const uint  MAX_BOUNCES = 8u;
+
+// ----------------------------------------------------------------------------
+// PCG random
+// ----------------------------------------------------------------------------
+uint pcgHash(uint v) {
+    uint state = v * 747796405u + 2891336453u;
+    uint word  = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+uint rngState;
+
+float rand() {
+    rngState = pcgHash(rngState);
+    return float(rngState) / 4294967296.0;
+}
+
+vec3 randUnitVec() {
+    float z = rand() * 2.0 - 1.0;
+    float a = rand() * 2.0 * PI;
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    return vec3(r * cos(a), r * sin(a), z);
+}
+
+// ----------------------------------------------------------------------------
+// Ray & intersections
+// ----------------------------------------------------------------------------
+struct Ray {
+    vec3 origin;
+    vec3 dir;
+};
+
+struct Hit {
+    float t;
+    vec3  point;
+    vec3  normal;     // 朝向入射方向（已翻转）
+    vec3  albedo;
+    float ior;
+    int   material;
+    bool  frontFace;
+};
+
+bool hitSphere(SphereGpu sp, Ray r, float tMin, float tMax, out Hit h) {
+    vec3 oc = r.origin - sp.center_radius.xyz;
+    float a = dot(r.dir, r.dir);
+    float b = dot(oc, r.dir);
+    float c = dot(oc, oc) - sp.center_radius.w * sp.center_radius.w;
+    float disc = b * b - a * c;
+    if (disc < 0.0) return false;
+    float sq = sqrt(disc);
+    float t = (-b - sq) / a;
+    if (t < tMin || t > tMax) {
+        t = (-b + sq) / a;
+        if (t < tMin || t > tMax) return false;
+    }
+    h.t = t;
+    h.point = r.origin + t * r.dir;
+    vec3 outwardN = (h.point - sp.center_radius.xyz) / sp.center_radius.w;
+    h.frontFace = dot(r.dir, outwardN) < 0.0;
+    h.normal = h.frontFace ? outwardN : -outwardN;
+    h.albedo = sp.albedo_ior.xyz;
+    h.ior = sp.albedo_ior.w;
+    h.material = sp.material;
+    return true;
+}
+
+bool hitWall(WallGpu wll, Ray r, float tMin, float tMax, out Hit h) {
+    float denom = dot(wll.plane.xyz, r.dir);
+    if (abs(denom) < 1e-9) return false;
+    float t = (wll.plane.w - dot(wll.plane.xyz, r.origin)) / denom;
+    if (t < tMin || t > tMax) return false;
+    h.t = t;
+    h.point = r.origin + t * r.dir;
+    vec3 outwardN = wll.plane.xyz;
+    h.frontFace = dot(r.dir, outwardN) < 0.0;
+    h.normal = h.frontFace ? outwardN : -outwardN;
+    h.albedo = wll.albedo.xyz;
+    h.ior = 0.0;
+    h.material = wll.material;
+    return true;
+}
+
+// 矩形灯光求交（仅用于直接可见与阴影测试）
+bool hitLight(LightGpu lt, Ray r, float tMin, float tMax, out float tOut) {
+    vec3 n = cross(lt.uvec.xyz, lt.vvec.xyz);
+    float denom = dot(n, r.dir);
+    if (abs(denom) < 1e-9) return false;
+    float t = dot(lt.corner.xyz - r.origin, n) / denom;
+    if (t < tMin || t > tMax) return false;
+    vec3 p = r.origin + t * r.dir;
+    vec3 vp = p - lt.corner.xyz;
+    float uu = dot(vp, lt.uvec.xyz);
+    float vv = dot(vp, lt.vvec.xyz);
+    // 注意：uvec/vvec 长度即为边长，故 0<=uu<=|u|^2, 0<=vv<=|v|^2
+    if (uu < 0.0 || vv < 0.0) return false;
+    if (uu > dot(lt.uvec.xyz, lt.uvec.xyz)) return false;
+    if (vv > dot(lt.vvec.xyz, lt.vvec.xyz)) return false;
+    tOut = t;
+    return true;
+}
+
+bool sceneIntersect(Ray r, float tMin, float tMax, out Hit h) {
+    Hit tmp;
+    bool found = false;
+    float closest = tMax;
+
+    for (int i = 0; i < spheres.s.length(); i++) {
+        if (hitSphere(spheres.s[i], r, tMin, closest, tmp)) {
+            found = true;
+            h = tmp;
+            closest = tmp.t;
+        }
+    }
+    for (int i = 0; i < walls.w.length(); i++) {
+        if (hitWall(walls.w[i], r, tMin, closest, tmp)) {
+            found = true;
+            h = tmp;
+            closest = tmp.t;
+        }
+    }
+    // 灯光作为可见几何体
+    for (int i = 0; i < lights.l.length(); i++) {
+        float tLight;
+        if (hitLight(lights.l[i], r, tMin, closest, tLight)) {
+            LightGpu lt = lights.l[i];
+            h.t = tLight;
+            h.point = r.origin + tLight * r.dir;
+            vec3 n = normalize(cross(lt.uvec.xyz, lt.vvec.xyz));
+            h.frontFace = dot(r.dir, n) < 0.0;
+            h.normal = h.frontFace ? n : -n;
+            h.albedo = lt.emission.xyz * lt.emission.w;
+            h.ior = 0.0;
+            h.material = MAT_EMISSIVE;
+            found = true;
+            closest = tLight;
+        }
+    }
+    return found;
+}
+
+// 阴影测试：只判断是否被遮挡（不含发光体）
+bool occluded(Ray r, float tMax) {
+    Hit tmp;
+    for (int i = 0; i < spheres.s.length(); i++) {
+        if (hitSphere(spheres.s[i], r, EPS, tMax, tmp)) return true;
+    }
+    for (int i = 0; i < walls.w.length(); i++) {
+        if (hitWall(walls.w[i], r, EPS, tMax, tmp)) return true;
+    }
+    return false;
+}
+
+// ----------------------------------------------------------------------------
+// 菲涅尔 (Schlick)
+// ----------------------------------------------------------------------------
+float schlickReflect(float cosTheta, float ior) {
+    float r0 = (1.0 - ior) / (1.0 + ior);
+    r0 = r0 * r0;
+    return r0 + (1.0 - r0) * pow(1.0 - cosTheta, 5.0);
+}
+
+// Snell 折射
+bool refract(vec3 v, vec3 n, float eta, out vec3 refracted) {
+    float cosI = dot(v, n);
+    float sinT2 = eta * eta * (1.0 - cosI * cosI);
+    if (sinT2 > 1.0) return false;
+    float cosT = sqrt(1.0 - sinT2);
+    refracted = eta * v - (eta * cosI + cosT) * n;
+    return true;
+}
+
+// ----------------------------------------------------------------------------
+// 相机光线生成
+// ----------------------------------------------------------------------------
+Ray genCameraRay(vec2 fragCoord) {
+    vec2 resolution = vec2(cam.width, cam.height);
+    float aspect = resolution.x / resolution.y;
+
+    vec3 forward = normalize(cam.target - cam.eye);
+    vec3 right   = normalize(cross(forward, cam.up));
+    vec3 upv     = cross(right, forward);
+
+    // 像素内抖动
+    vec2 jitter = vec2(rand(), rand()) - 0.5;
+    // Vulkan 中 Y=0 在顶部，需翻转 Y 使屏幕上方对应 upv 正方向
+    vec2 uv = (fragCoord + jitter) / resolution * 2.0 - 1.0;
+    uv.y = -uv.y;
+    uv.x *= aspect;
+
+    float halfH = tan(cam.fov * 0.5);
+    float halfW = halfH * aspect;
+
+    vec3 dir = normalize(forward + uv.x * halfW * right + uv.y * halfH * upv);
+    Ray r;
+    r.origin = cam.eye;
+    r.dir = dir;
+    return r;
+}
+
+// ----------------------------------------------------------------------------
+// 路径追踪主循环
+// ----------------------------------------------------------------------------
+vec3 trace(Ray primaryRay) {
+    Ray r = primaryRay;
+    vec3 throughput = vec3(1.0);
+    vec3 radiance = vec3(0.0);
+
+    for (uint bounce = 0u; bounce < MAX_BOUNCES; bounce++) {
+        Hit h;
+        if (!sceneIntersect(r, EPS, 1e9, h)) {
+            // 未命中 = 黑色背景（房间封闭，理论上不会到这里）
+            break;
+        }
+
+        // === Next Event Estimation: 显式采样灯光 ===
+        // 仅对非发光面采样
+        if (h.material != MAT_EMISSIVE) {
+            // 取第一个灯光
+            for (int li = 0; li < lights.l.length(); li++) {
+                LightGpu lt = lights.l[li];
+                // 在矩形上均匀采样一点
+                float ru = rand();
+                float rv = rand();
+                vec3 lp = lt.corner.xyz + ru * lt.uvec.xyz + rv * lt.vvec.xyz;
+                vec3 toL = lp - h.point;
+                float distToL = length(toL);
+                vec3 L = toL / distToL;
+
+                float cosNl = dot(h.normal, L);
+                if (cosNl <= 0.0) continue;  // 背面
+
+                Ray shadowRay;
+                shadowRay.origin = h.point + h.normal * EPS;
+                shadowRay.dir = L;
+                if (occluded(shadowRay, distToL - EPS)) continue;
+
+                // 灯光面积
+                float lightArea = length(cross(lt.uvec.xyz, lt.vvec.xyz));
+                float lightPdf = 1.0 / lightArea;
+                // BRDF: diffuse / cosine-weighted
+                vec3 brdf = h.material == MAT_DIFFUSE
+                          ? h.albedo * INV_PI
+                          : vec3(0.0); // 玻璃不做 NEE
+                float cosL = abs(dot(normalize(cross(lt.uvec.xyz, lt.vvec.xyz)), -L));
+                if (h.material == MAT_DIFFUSE) {
+                    vec3 Le = lt.emission.xyz * lt.emission.w;
+                    radiance += throughput * brdf * Le * cosNl * cosL * lightPdf;
+                }
+            }
+        }
+
+        // === 处理材质 ===
+        if (h.material == MAT_EMISSIVE) {
+            // 灯光表面：直接返回发光颜色（emission.xyz * emission.w）
+            vec3 Le = h.albedo * 3.0;
+            radiance += throughput * Le;
+            break;
+        }
+
+        if (h.material == MAT_DIFFUSE) {
+            // 余弦加权半球采样
+            vec3 newDir = normalize(h.normal + randUnitVec());
+            if (dot(newDir, newDir) < 1e-6) newDir = h.normal;
+            throughput *= h.albedo; // Lambertian BRDF * cos / pdf = albedo
+            r.origin = h.point + h.normal * EPS;
+            r.dir = newDir;
+            continue;
+        }
+
+        if (h.material == MAT_GLASS) {
+            float ior = h.ior > 0.0 ? h.ior : 1.5;
+            float eta = h.frontFace ? (1.0 / ior) : ior;
+            vec3 n = h.normal;
+            float cosI = abs(dot(r.dir, n));
+            float cosT;
+            float sinT2 = eta * eta * (1.0 - cosI * cosI);
+            float kr = (sinT2 > 1.0) ? 1.0 : schlickReflect(cosI, ior);
+
+            vec3 reflected = reflect(r.dir, n);
+            Ray reflectRay;
+            reflectRay.origin = h.point + n * EPS;
+            reflectRay.dir = reflected;
+
+            if (sinT2 > 1.0) {
+                // 全内反射
+                throughput *= h.albedo;
+                r = reflectRay;
+                continue;
+            }
+
+            vec3 refractedDir = eta * r.dir + (eta * cosI - sqrt(1.0 - sinT2)) * n;
+            Ray refractRay;
+            refractRay.origin = h.point - n * EPS;
+            refractRay.dir = normalize(refractedDir);
+
+            // 俄罗斯轮盘赌
+            if (rand() < kr) {
+                throughput *= h.albedo;
+                r = reflectRay;
+            } else {
+                throughput *= h.albedo;
+                r = refractRay;
+            }
+            continue;
+        }
+
+        if (h.material == MAT_METAL) {
+            vec3 reflected = reflect(r.dir, h.normal);
+            throughput *= h.albedo;
+            r.origin = h.point + h.normal * EPS;
+            r.dir = reflected;
+            continue;
+        }
+
+        break;
+    }
+
+    return radiance;
+}
+
+// ----------------------------------------------------------------------------
+// 入口
+// ----------------------------------------------------------------------------
+void main() {
+    ivec2 pix = ivec2(gl_GlobalInvocationID.xy);
+    if (pix.x >= int(cam.width) || pix.y >= int(cam.height)) return;
+
+    // 初始化 RNG：像素位置 + 帧数
+    rngState = pcgHash(uint(pix.x) * 1973u + uint(pix.y) * 9277u + cam.frameCount * 26699u);
+
+    Ray r = genCameraRay(vec2(pix) + 0.5);
+    vec3 color = trace(r);
+
+    // 累积
+    vec3 prev = imageLoad(uAccumImg, pix).rgb;
+    vec3 accum;
+    if (cam.frameCount > 0u) {
+        accum = prev + color;
+    } else {
+        accum = color;
+    }
+    imageStore(uAccumImg, pix, vec4(accum, 1.0));
+}

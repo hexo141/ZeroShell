@@ -43,10 +43,12 @@ bool injectDll(DWORD pid, const std::wstring& dllPath) {
         return false;
     }
     WaitForSingleObject(hThread, INFINITE);
+    DWORD exitCode = 0;
+    GetExitCodeThread(hThread, &exitCode);
     VirtualFreeEx(hProc, remoteMem, 0, MEM_RELEASE);
     CloseHandle(hThread);
     CloseHandle(hProc);
-    return true;
+    return exitCode != 0;
 }
 
 bool unloadDll(DWORD pid, HMODULE hMod) {

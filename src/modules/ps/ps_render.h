@@ -27,4 +27,4 @@ void drawProcDetail(HANDLE hOut, const ProcDetail& d, int& scrollOff, int width,
 // ─── 工具视图与 DLL 列表 ──────────────────────────────────────────────────────
 
 void drawToolView(HANDLE hOut, const std::string& name, DWORD pid, int& sel, int width, int bottomY, const std::string& msg);
-void drawDllListView(HANDLE hOut, const std::vector<std::wstring>& names, const std::vector<HMODULE>& bases, DWORD pid, int& sel, int& scrollOff, int width, int bottomY);
+void drawDllListView(HANDLE hOut, const std::vector<std::wstring>& names, const std::vector<HMODULE>& bases, DWORD pid, int& sel, int& scrollOff, int width, int bottomY, const std::wstring& filter = L"");

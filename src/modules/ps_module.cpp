@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <cwctype>
 #include <windows.h>
 
 #include "ps/ps_common.h"
@@ -75,6 +76,10 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
     int dllScroll = 0;
     std::vector<std::wstring> dllNames;
     std::vector<HMODULE> dllBases;
+    std::vector<std::wstring> dllDisplayNames;
+    std::vector<HMODULE> dllDisplayBases;
+    std::wstring dllFilter;
+    bool dllSearching = false;
 
     // 内存视图状态
     bool showingMemView = false;
@@ -190,7 +195,26 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                                               memSearchValEditing, memSearchValInput,
                                               width, bottomRow);
             } else if (showingDllList) {
-                drawDllListView(hOut, dllNames, dllBases, currentDetail.pid, dllSel, dllScroll, width, bottomRow);
+                if (dllSearching && !dllFilter.empty()) {
+                    dllDisplayNames.clear();
+                    dllDisplayBases.clear();
+                    std::wstring lowerFilter = dllFilter;
+                    for (auto& c : lowerFilter) c = (wchar_t)towlower(c);
+                    for (size_t i = 0; i < dllNames.size(); ++i) {
+                        std::wstring lowerName = dllNames[i];
+                        for (auto& c : lowerName) c = (wchar_t)towlower(c);
+                        if (lowerName.find(lowerFilter) != std::wstring::npos) {
+                            dllDisplayNames.push_back(dllNames[i]);
+                            dllDisplayBases.push_back(dllBases[i]);
+                        }
+                    }
+                } else {
+                    dllDisplayNames = dllNames;
+                    dllDisplayBases = dllBases;
+                }
+                if (dllSel >= (int)dllDisplayNames.size()) dllSel = (int)dllDisplayNames.size() - 1;
+                if (dllSel < 0) dllSel = 0;
+                drawDllListView(hOut, dllDisplayNames, dllDisplayBases, currentDetail.pid, dllSel, dllScroll, width, bottomRow, dllSearching ? dllFilter : L"");
             } else if (showingTool) {
                 drawToolView(hOut, currentDetail.name, currentDetail.pid, toolSel, width, bottomRow, toolMsg);
             } else if (showingDetail) {
@@ -239,31 +263,65 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
         int maxVisible = listHeight - 1; // minus header
 
         if (showingDllList) {
-            if (vk == VK_UP) {
+            if (dllSearching) {
+                if (vk == VK_ESCAPE) {
+                    dllSearching = false;
+                    dllFilter.clear();
+                    dllSel = 0;
+                    dllScroll = 0;
+                    needRefresh = true;
+                } else if (vk == VK_RETURN) {
+                    dllSearching = false;
+                    needRefresh = true;
+                } else if (vk == VK_BACK) {
+                    if (!dllFilter.empty()) {
+                        dllFilter.pop_back();
+                        dllSel = 0;
+                        dllScroll = 0;
+                        needRefresh = true;
+                    }
+                } else if (wch >= 32) {
+                    dllFilter += wch;
+                    dllSel = 0;
+                    dllScroll = 0;
+                    needRefresh = true;
+                }
+            } else if (wch == L'/') {
+                dllSearching = true;
+                dllFilter.clear();
+                needRefresh = true;
+            } else if (vk == VK_UP) {
                 if (dllSel > 0) { dllSel--; needRefresh = true; }
             } else if (vk == VK_DOWN) {
-                if (dllSel < (int)dllNames.size() - 1) { dllSel++; needRefresh = true; }
+                if (dllSel < (int)dllDisplayNames.size() - 1) { dllSel++; needRefresh = true; }
             } else if (vk == VK_PRIOR) {
                 dllSel -= (std::max)(1, totalRows - 4);
                 if (dllSel < 0) dllSel = 0;
                 needRefresh = true;
             } else if (vk == VK_NEXT) {
                 dllSel += (std::max)(1, totalRows - 4);
-                if (dllSel >= (int)dllNames.size()) dllSel = (int)dllNames.size() - 1;
+                if (dllSel >= (int)dllDisplayNames.size()) dllSel = (int)dllDisplayNames.size() - 1;
                 needRefresh = true;
             } else if (vk == VK_HOME) {
                 dllSel = 0;
                 needRefresh = true;
             } else if (vk == VK_END) {
-                dllSel = (int)dllNames.size() - 1;
+                dllSel = (int)dllDisplayNames.size() - 1;
                 needRefresh = true;
             } else if (vk == VK_RETURN) {
-                if (dllSel >= 0 && dllSel < (int)dllBases.size()) {
-                    bool ok = unloadDll(currentDetail.pid, dllBases[dllSel]);
+                if (dllSel >= 0 && dllSel < (int)dllDisplayBases.size()) {
+                    bool ok = unloadDll(currentDetail.pid, dllDisplayBases[dllSel]);
                     if (ok) {
-                        dllNames.erase(dllNames.begin() + dllSel);
-                        dllBases.erase(dllBases.begin() + dllSel);
-                        if (dllSel >= (int)dllNames.size()) dllSel = (int)dllNames.size() - 1;
+                        // Find and remove from both lists
+                        HMODULE targetMod = dllDisplayBases[dllSel];
+                        for (size_t i = 0; i < dllBases.size(); ++i) {
+                            if (dllBases[i] == targetMod) {
+                                dllNames.erase(dllNames.begin() + i);
+                                dllBases.erase(dllBases.begin() + i);
+                                break;
+                            }
+                        }
+                        if (dllSel >= (int)dllDisplayNames.size()) dllSel = (int)dllDisplayNames.size() - 1;
                         if (dllSel < 0) dllSel = 0;
                     } else {
                         toolMsg = "Unload failed";
@@ -275,6 +333,8 @@ bool PsModule::execute(const std::string& cmd, const std::vector<std::string>& a
                 showingDllList = false;
                 dllSel = 0;
                 dllScroll = 0;
+                dllSearching = false;
+                dllFilter.clear();
                 needRefresh = true;
             } else if (vk == 'Q' && wch == L'q') {
                 running = false;

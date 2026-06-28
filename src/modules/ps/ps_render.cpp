@@ -299,7 +299,7 @@ void drawToolView(HANDLE hOut, const std::string& name, DWORD pid, int& sel, int
     writeStr(hOut, std::string(BG_DARK) + COLOR_WHITE + "  Enter Execute  Esc Back  q Exit" + COLOR_RESET + "\x1b[K");
 }
 
-void drawDllListView(HANDLE hOut, const std::vector<std::wstring>& names, const std::vector<HMODULE>& bases, DWORD pid, int& sel, int& scrollOff, int width, int bottomY) {
+void drawDllListView(HANDLE hOut, const std::vector<std::wstring>& names, const std::vector<HMODULE>& bases, DWORD pid, int& sel, int& scrollOff, int width, int bottomY, const std::wstring& filter) {
     (void)bases;
     SetConsoleCursorPosition(hOut, {0, 0});
     int count = (int)names.size();
@@ -332,8 +332,14 @@ void drawDllListView(HANDLE hOut, const std::vector<std::wstring>& names, const 
     SetConsoleCursorPosition(hOut, {0, (SHORT)bottomY});
     int lastLine = (std::min)(count, scrollOff + maxVis);
     int pct = (count <= maxVis) ? 100 : (scrollOff * 100 / (count - maxVis));
-    snprintf(buf, sizeof(buf), "%s%s  %d DLLs (%d/%d %d%%)  \xe2\x86\x91\xe2\x86\x93 Select  Enter Unload  Esc Back  q Exit%s",
-        BG_DARK, COLOR_WHITE, count, lastLine, count, pct, COLOR_RESET);
+    if (!filter.empty()) {
+        std::string utf8Filter = wideToUtf8(filter);
+        snprintf(buf, sizeof(buf), "%s%s  /%s  %d DLLs (%d/%d)  \xe2\x86\x91\xe2\x86\x93 Select  Enter Unload  Esc Back  q Exit%s",
+            BG_DARK, COLOR_WHITE, utf8Filter.c_str(), count, lastLine, count, COLOR_RESET);
+    } else {
+        snprintf(buf, sizeof(buf), "%s%s  %d DLLs (%d/%d %d%%)  \xe2\x86\x91\xe2\x86\x93 Select  Enter Unload  / Filter  Esc Back  q Exit%s",
+            BG_DARK, COLOR_WHITE, count, lastLine, count, pct, COLOR_RESET);
+    }
     writeStr(hOut, buf);
     writeStr(hOut, "\x1b[K");
 }

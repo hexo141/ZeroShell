@@ -19,6 +19,12 @@
     <Filter Include="模块\ps">
       <UniqueIdentifier>{B2C3D4E5-F6A7-8901-BCDE-F12345678901}</UniqueIdentifier>
     </Filter>
+    <Filter Include="模块\vkray">
+      <UniqueIdentifier>{C3D4E5F6-A7B8-9012-CDEF-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="模块\vkray\shaders">
+      <UniqueIdentifier>{D4E5F6A7-B8C9-0123-DEFA-345678901234}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp">
@@ -125,6 +131,18 @@
     </ClCompile>
 
     </ClCompile>
+    <ClCompile Include="src\modules\vkray_module.cpp">
+      <Filter>模块</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\vkray\vkray_window.cpp">
+      <Filter>模块\vkray</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\vkray\vkray_renderer.cpp">
+      <Filter>模块\vkray</Filter>
+    </ClCompile>
+    <ClCompile Include="src\modules\vkray\vkray_log_window.cpp">
+      <Filter>模块\vkray</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="res\resource.rc">
@@ -228,5 +246,34 @@
     <ClInclude Include="include\modules\fileop_module.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="src\modules\vkray_module.h">
+      <Filter>模块</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\vkray\vkray_window.h">
+      <Filter>模块\vkray</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\vkray\vkray_renderer.h">
+      <Filter>模块\vkray</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\vkray\vkray_scene.h">
+      <Filter>模块\vkray</Filter>
+    </ClInclude>
+    <ClInclude Include="src\modules\vkray\vkray_log_window.h">
+      <Filter>模块\vkray</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\modules\vkray\shaders\pathtracer.comp">
+      <Filter>模块\vkray\shaders</Filter>
+    </None>
+    <None Include="src\modules\vkray\shaders\present.vert">
+      <Filter>模块\vkray\shaders</Filter>
+    </None>
+    <None Include="src\modules\vkray\shaders\present.frag">
+      <Filter>模块\vkray\shaders</Filter>
+    </None>
+    <None Include="src\modules\vkray\compile_shaders.bat">
+      <Filter>模块\vkray</Filter>
+    </None>
   </ItemGroup>
 </Project>
